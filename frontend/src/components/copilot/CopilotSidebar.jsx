@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, MessageSquare, ChevronLeft, Sparkles } from 'lucide-react'
+import { Plus, MessageSquare, ChevronLeft, Sparkles, Trash2 } from 'lucide-react'
 
 const DEMO_CONVERSATIONS = [
     { id: 'current', title: 'New Conversation', time: 'now', group: 'Today' },
 ]
 
-export default function CopilotSidebar({ collapsed, onToggle, activeConvId, onNewChat, conversations = DEMO_CONVERSATIONS }) {
+export default function CopilotSidebar({ collapsed, onToggle, activeConvId, onNewChat, onSelectChat, onDeleteChat, conversations = DEMO_CONVERSATIONS }) {
     const grouped = groupByTime(conversations)
 
     return (
@@ -54,13 +54,25 @@ export default function CopilotSidebar({ collapsed, onToggle, activeConvId, onNe
                             <div key={group} className="cop-sidebar-group">
                                 <p className="cop-sidebar-group-label">{group}</p>
                                 {convs.map(conv => (
-                                    <button
-                                        key={conv.id}
-                                        className={`cop-sidebar-item ${conv.id === activeConvId ? 'cop-sidebar-item--active' : ''}`}
-                                    >
-                                        <MessageSquare size={14} />
-                                        <span className="cop-sidebar-item-title">{conv.title}</span>
-                                    </button>
+                                    <div key={conv.id} className="cop-sidebar-item-wrapper">
+                                        <button
+                                            className={`cop-sidebar-item ${conv.id === activeConvId ? 'cop-sidebar-item--active' : ''}`}
+                                            onClick={() => onSelectChat && onSelectChat(conv.id)}
+                                        >
+                                            <MessageSquare size={14} />
+                                            <span className="cop-sidebar-item-title">{conv.title}</span>
+                                        </button>
+                                        <button
+                                            className="cop-sidebar-item-delete"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onDeleteChat && onDeleteChat(conv.id);
+                                            }}
+                                            title="Delete chat"
+                                        >
+                                            <Trash2 size={13} />
+                                        </button>
+                                    </div>
                                 ))}
                             </div>
                         ))}
@@ -82,7 +94,11 @@ function groupByTime(conversations) {
             groups[conv.group] = groups[conv.group] || []
             groups[conv.group].push(conv)
         } else {
-            groups['Today'].push(conv)
+            // Compute group dynamic
+            const diff = Date.now() - new Date(conv.created_at || Date.now()).getTime()
+            if (diff < 86400000) groups['Today'].push(conv)
+            else if (diff < 172800000) groups['Yesterday'].push(conv)
+            else groups['Previous'].push(conv)
         }
     })
 

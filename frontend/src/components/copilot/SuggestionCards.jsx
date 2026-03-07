@@ -2,11 +2,11 @@ import { motion } from 'framer-motion'
 import { BookOpen, BarChart3, Target, MessageCircle, Code2 } from 'lucide-react'
 
 const SUGGESTIONS = [
-    { icon: BookOpen, text: 'Generate a 4-week DSA study plan', color: 'var(--accent)' },
-    { icon: BarChart3, text: 'Explain my last interview results', color: 'var(--emerald)' },
-    { icon: Target, text: 'What topics should I focus on?', color: 'var(--sky)' },
-    { icon: MessageCircle, text: 'Practice a mock HR question', color: 'var(--rose)' },
-    { icon: Code2, text: 'Review my coding weak points', color: 'var(--accent-soft)' },
+    { id: 'study_plan', icon: BookOpen, text: 'Generate a 4-week DSA study plan', color: 'var(--accent)' },
+    { id: 'explain_results', icon: BarChart3, text: 'Explain my last interview results', color: 'var(--emerald)' },
+    { id: 'focus_topics', icon: Target, text: 'What topics should I focus on?', color: 'var(--sky)' },
+    { id: 'hr_question', icon: MessageCircle, text: 'Practice a mock HR question', color: 'var(--rose)' },
+    { id: 'weak_points', icon: Code2, text: 'Review my coding weak points', color: 'var(--accent-soft)' },
 ]
 
 export default function SuggestionCards({ onSelect, disabled }) {
@@ -36,7 +36,7 @@ export default function SuggestionCards({ onSelect, disabled }) {
                             transition={{ duration: 0.35, delay: i * 0.07 }}
                             whileHover={{ scale: 1.02, y: -2 }}
                             whileTap={{ scale: 0.98 }}
-                            onClick={() => onSelect(s.text)}
+                            onClick={() => onSelect(s.id)}
                             disabled={disabled}
                         >
                             <div className="cop-suggestion-icon" style={{ color: s.color }}>

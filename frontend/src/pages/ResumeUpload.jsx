@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
-import { Trash2, MessageSquare } from 'lucide-react'
+import { Trash2, MessageSquare, Play } from 'lucide-react'
 import { resumeApi } from '../services/api.js'
 
 const ACCEPTED = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
@@ -143,7 +143,19 @@ export default function ResumeUpload() {
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" strokeWidth="2.5" strokeLinecap="round"><polyline points="20,6 9,17 4,12" /></svg>
                         </div>
                         <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, color: 'var(--emerald)', fontWeight: 600 }}>Resume analysed</p>
-                        <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 11, color: 'var(--text-2)', marginTop: 4 }}>{file.name}</p>
+                        <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 11, color: 'var(--text-2)', marginTop: 4, marginBottom: 16 }}>{file.name}</p>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); navigate('/start', { state: { role: result.primary_role } }); }}
+                            style={{
+                                background: 'var(--accent)', color: '#000', border: 'none',
+                                padding: '8px 24px', borderRadius: 8, fontSize: 13,
+                                fontWeight: 700, cursor: 'pointer', fontFamily: 'Manrope, sans-serif',
+                                display: 'inline-flex', alignItems: 'center', gap: 8,
+                                boxShadow: '0 4px 12px var(--accent-glow)'
+                            }}
+                        >
+                            <Play size={14} fill="currentColor" /> Start Interview
+                        </button>
                     </div>
                 ) : (
                     <div>
@@ -215,12 +227,18 @@ export default function ResumeUpload() {
                                         Uploaded {new Date(r.created_at).toLocaleDateString()}
                                     </p>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); navigate('/start', { state: { role: r.primary_role } }); }}
+                                        style={{ background: 'var(--bg-3)', color: 'var(--text-0)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                                    >
+                                        <Play size={12} fill="currentColor" /> Practice
+                                    </button>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); handleTouch(r.id); }}
-                                        style={{ background: 'var(--accent)', color: '#000', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                                        style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: 'none', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                                     >
-                                        <MessageSquare size={14} /> Analyze
+                                        <MessageSquare size={12} /> Copilot
                                     </button>
                                     <button
                                         onClick={(e) => handleDelete(r.id, e)}

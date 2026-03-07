@@ -74,9 +74,12 @@ export const analyticsApi = {
 
 // ── Chat / Copilot ───────────────────────────────────────────
 export const chatApi = {
-    send: (msg) => api.post('/chat/message', { message: msg }),
-    history: () => api.get('/chat/history'),
-    quickAction: (type) => api.post('/chat/quick-action', { action: type }),
+    sessions: () => api.get('/chat/sessions'),
+    createSession: (title) => api.post('/chat/sessions', { title }),
+    deleteSession: (id) => api.delete(`/chat/sessions/${id}`),
+    send: (msg, sessionId) => api.post('/chat/message', { message: msg, sessionId }),
+    history: (sessionId) => api.get('/chat/history', { params: { sessionId } }),
+    quickAction: (type, sessionId) => api.post('/chat/quick-action', { action: type, sessionId }),
 }
 
 export default api

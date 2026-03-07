@@ -58,7 +58,7 @@ app.use("/coding", aiLimiter);
 // Strict limit for uploads
 const uploadLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 5,
+    max: 50, // Temporarily increased to 50 so they don't get blocked
     message: { error: "Upload rate limit reached. Please wait before retrying." },
 });
 app.use("/resume", uploadLimiter);

@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { interviewApi } from '../services/api.js'
 
@@ -23,11 +23,18 @@ const fadeUp = {
 
 export default function StartInterview() {
     const navigate = useNavigate()
+    const location = useLocation()
     const [role, setRole] = useState('Frontend Engineer')
     const [difficulty, setDifficulty] = useState('Intermediate')
     const [round, setRound] = useState('technical')
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
+
+    useEffect(() => {
+        if (location.state?.role) {
+            setRole(location.state.role)
+        }
+    }, [location.state])
 
     const selectedRound = ROUNDS.find(r => r.id === round)
 

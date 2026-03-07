@@ -14,24 +14,66 @@ import InsightsPanel from '../components/copilot/InsightsPanel.jsx'
 export default function CareerCopilot() {
     const location = useLocation()
     const [messages, setMessages] = useState([])
+    const [sessions, setSessions] = useState([])
+    const [activeConvId, setActiveConvId] = useState(null)
     const [input, setInput] = useState(location.state?.context || '')
     const [sending, setSending] = useState(false)
     const [loading, setLoading] = useState(true)
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
     const bottomRef = useRef(null)
 
-    // Load chat history
+    // Load chat sessions
     useEffect(() => {
-        chatApi.history()
-            .then(r => setMessages(r.data?.messages || []))
-            .catch(() => setMessages([]))
-            .finally(() => setLoading(false))
+        chatApi.sessions()
+            .then(r => {
+                const loaded = r.data?.sessions || [];
+                setSessions(loaded);
+                if (loaded.length > 0) {
+                    loadChat(loaded[0].id);
+                } else {
+                    handleNewChat();
+                }
+            })
+            .catch((e) => {
+                alert("Load sessions error: " + e.message);
+                setLoading(false);
+            })
     }, [])
+
+    const loadChat = async (id) => {
+        setLoading(true);
+        setActiveConvId(id);
+        try {
+            const res = await chatApi.history(id);
+            setMessages(res.data?.messages || []);
+        } catch (e) {
+            setMessages([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleNewChat = async () => {
+        setLoading(true);
+        try {
+            const res = await chatApi.createSession("New Conversation");
+            const newSess = res.data.session;
+            setSessions(prev => [newSess, ...prev]);
+            setActiveConvId(newSess.id);
+            setMessages([]);
+        } catch (e) {
+            alert("New chat error: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     // Auto-send context message on load
     useEffect(() => {
-        if (location.state?.context && !loading) handleSend(location.state.context)
-    }, [loading])
+        if (location.state?.context && !loading && activeConvId) {
+            handleSend(location.state.context)
+        }
+    }, [loading, activeConvId])
 
     // Scroll to bottom on new messages
     useEffect(() => {
@@ -40,20 +82,49 @@ export default function CareerCopilot() {
 
     const handleSend = async (text) => {
         const content = (text ?? input).trim()
-        if (!content || sending) return
+        if (!content || sending || !activeConvId) return
         setInput('')
         setSending(true)
 
-        const userMsg = { role: 'user', content, id: Date.now() }
+        const isAction = ['study_plan', 'explain_results', 'weak_points', 'hr_question', 'focus_topics'].includes(content);
+
+        const actionLabels = {
+            study_plan: "Generate a 4-week DSA study plan",
+            explain_results: "Explain my last interview results",
+            weak_points: "Review my coding weak points",
+            hr_question: "Practice a mock HR question",
+            focus_topics: "What topics should I focus on?"
+        };
+
+        const displayContent = isAction ? actionLabels[content] : content;
+        const userMsg = { role: 'user', content: displayContent, id: Date.now() }
         setMessages(prev => [...prev, userMsg])
 
         try {
-            const res = await chatApi.send(content)
+            let res;
+            if (isAction) {
+                res = await chatApi.quickAction(content, activeConvId);
+            } else {
+                res = await chatApi.send(content, activeConvId);
+            }
+
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 content: res.data.response,
                 id: Date.now() + 1,
             }])
+
+            // Update session title if it was "New Conversation" locally
+            setSessions(prev => prev.map(s => {
+                if (s.id === activeConvId && s.title === "New Conversation") {
+                    let newTitle = isAction
+                        ? "Quick Action: " + content.replace(/_/g, ' ')
+                        : content.substring(0, 30);
+                    return { ...s, title: newTitle };
+                }
+                return s;
+            }));
+
         } catch (e) {
             setMessages(prev => [...prev, {
                 role: 'assistant',
@@ -66,8 +137,23 @@ export default function CareerCopilot() {
         }
     }
 
-    const clearChat = () => {
-        setMessages([])
+    const deleteConversation = async (idToDel = activeConvId) => {
+        if (!idToDel) return;
+        try {
+            await chatApi.deleteSession(idToDel);
+            // Remove from list
+            const remaining = sessions.filter(s => s.id !== idToDel);
+            setSessions(remaining);
+            if (idToDel === activeConvId) {
+                if (remaining.length > 0) {
+                    loadChat(remaining[0].id);
+                } else {
+                    handleNewChat();
+                }
+            }
+        } catch (e) {
+            console.error("Failed to delete chat", e);
+        }
     }
 
     return (
@@ -76,8 +162,11 @@ export default function CareerCopilot() {
             <CopilotSidebar
                 collapsed={sidebarCollapsed}
                 onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-                activeConvId="current"
-                onNewChat={clearChat}
+                activeConvId={activeConvId}
+                onNewChat={handleNewChat}
+                onSelectChat={loadChat}
+                onDeleteChat={deleteConversation}
+                conversations={sessions}
             />
 
             {/* Center — Main Chat */}
@@ -103,7 +192,7 @@ export default function CareerCopilot() {
                         </div>
                     </div>
                     {messages.length > 0 && (
-                        <button className="cop-header-icon-btn cop-header-clear" onClick={clearChat} title="Clear conversation">
+                        <button className="cop-header-icon-btn cop-header-clear" onClick={() => deleteConversation()} title="Clear conversation">
                             <Trash2 size={16} />
                         </button>
                     )}
@@ -118,7 +207,9 @@ export default function CareerCopilot() {
                             ))}
                         </div>
                     ) : messages.length === 0 && !sending ? (
-                        <SuggestionCards onSelect={handleSend} disabled={sending} />
+                        <SuggestionCards onSelect={(val) => {
+                            if (val) handleSend(val);
+                        }} disabled={sending} />
                     ) : (
                         <div className="cop-messages-list">
                             {messages.map((msg, i) => (
@@ -139,7 +230,7 @@ export default function CareerCopilot() {
                     input={input}
                     setInput={setInput}
                     onSend={() => handleSend()}
-                    sending={sending}
+                    sending={sending || loading}
                 />
             </div>
 
@@ -314,6 +405,34 @@ const copilotStyles = `
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.cop-sidebar-item-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.cop-sidebar-item-delete {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    color: var(--text-2);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 6px;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s, color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cop-sidebar-item-wrapper:hover .cop-sidebar-item-delete {
+    opacity: 1;
+}
+.cop-sidebar-item-delete:hover {
+    color: var(--rose);
+    background: rgba(251, 113, 133, 0.1);
 }
 
 /* ── CHAT HEADER ──────────────────────────────────────────── */

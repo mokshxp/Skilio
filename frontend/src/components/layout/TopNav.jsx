@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../../context/ThemeContext.jsx'
 
 const NAV_LINKS = [
-    { to: '/dashboard', label: 'Dashboard' },
     { to: '/resume', label: 'Resume' },
     { to: '/start', label: 'Interview' },
     { to: '/copilot', label: 'Copilot' },
@@ -120,7 +119,7 @@ export default function TopNav({ devMode }) {
                         <button
                             className="visible-mobile"
                             onClick={() => setMobileOpen(o => !o)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-1)', display: 'none' }}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-1)' }}
                         >
                             <HamburgerIcon open={mobileOpen} />
                         </button>

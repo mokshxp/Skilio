@@ -211,7 +211,7 @@ export default function LandingPage({ devMode }) {
                                 </div>
                             </SafeSignedOut>
                             <SafeSignedIn>
-                                <div className="flex items-center">
+                                <div className="flex items-center gap-4">
                                     <UserButton appearance={{ elements: { avatarBox: { width: 32, height: 32 } } }} afterSignOutUrl="/" />
                                 </div>
                             </SafeSignedIn>
