@@ -26,7 +26,7 @@ export default function CareerCopilot() {
     useEffect(() => {
         chatApi.sessions()
             .then(r => {
-                const loaded = r.data?.sessions || [];
+                const loaded = r.sessions || [];
                 setSessions(loaded);
                 if (loaded.length > 0) {
                     loadChat(loaded[0].id);
@@ -35,7 +35,7 @@ export default function CareerCopilot() {
                 }
             })
             .catch((e) => {
-                alert("Load sessions error: " + e.message);
+                console.warn("Load sessions error:", e.message);
                 setLoading(false);
             })
     }, [])
@@ -45,7 +45,7 @@ export default function CareerCopilot() {
         setActiveConvId(id);
         try {
             const res = await chatApi.history(id);
-            setMessages(res.data?.messages || []);
+            setMessages(res.messages || []);
         } catch (e) {
             setMessages([]);
         } finally {
@@ -57,7 +57,7 @@ export default function CareerCopilot() {
         setLoading(true);
         try {
             const res = await chatApi.createSession("New Conversation");
-            const newSess = res.data.session;
+            const newSess = res.session;
             setSessions(prev => [newSess, ...prev]);
             setActiveConvId(newSess.id);
             setMessages([]);
@@ -75,9 +75,15 @@ export default function CareerCopilot() {
         }
     }, [loading, activeConvId])
 
-    // Scroll to bottom on new messages
+    // Scroll to bottom on new messages or typing state changes
     useEffect(() => {
-        bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+        if (messages.length > 0 || sending) {
+            // Tiny timeout ensures the DOM and Framer Motion elements have painted
+            const timer = setTimeout(() => {
+                bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+            }, 50)
+            return () => clearTimeout(timer)
+        }
     }, [messages, sending])
 
     const handleSend = async (text) => {
@@ -110,7 +116,7 @@ export default function CareerCopilot() {
 
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: res.data.response,
+                content: res.response,
                 id: Date.now() + 1,
             }])
 
@@ -252,9 +258,9 @@ const copilotStyles = `
 /* ── LAYOUT ───────────────────────────────────────────────── */
 .cop-layout {
     display: flex;
-    height: calc(100vh - 68px);
+    height: calc(100vh - 65px); /* 100vh - nav (65) */
     overflow: hidden;
-    margin: -48px -32px -80px;
+    margin: -48px -32px -32px;
     background: var(--bg-0);
 }
 

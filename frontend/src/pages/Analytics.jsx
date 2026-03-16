@@ -17,7 +17,7 @@ export default function Analytics() {
 
     useEffect(() => {
         analyticsApi.get()
-            .then(r => setData(r.data))
+            .then(r => setData(r))
             .catch(e => setError(e.message))
             .finally(() => setLoading(false))
     }, [])

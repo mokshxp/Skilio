@@ -66,10 +66,10 @@ export default function Dashboard() {
             </motion.div>
 
             {/* Main 2-col */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 48, alignItems: 'start' }}>
+            <motion.div variants={container} style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 48, alignItems: 'start' }}>
 
                 {/* LEFT */}
-                <div>
+                <motion.div variants={container}>
                     {/* Score */}
                     <motion.div variants={fadeUp} style={{ marginBottom: 36 }}>
                         <p style={LABEL}>Average Score</p>
@@ -161,7 +161,7 @@ export default function Dashboard() {
                             </motion.div>
                         )}
                     </motion.div>
-                </div>
+                </motion.div>
 
                 {/* RIGHT — Telemetry column */}
                 <motion.div variants={fadeLeft}>
@@ -179,7 +179,7 @@ export default function Dashboard() {
                     <QA label="Open Copilot" onClick={() => navigate('/copilot')} />
                     <QA label="View Analytics" onClick={() => navigate('/analytics')} />
                 </motion.div>
-            </div>
+            </motion.div>
         </motion.div>
     )
 }

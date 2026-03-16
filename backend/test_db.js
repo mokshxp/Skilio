@@ -1,10 +1,35 @@
-const { createClient } = require("@supabase/supabase-js");
-require("dotenv").config({ path: __dirname + "/.env" });
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-(async () => {
-    console.log("Testing auth and db query...");
-    const { data: d1, error: e1 } = await supabase.from("interview_sessions").select("*").order("start_time", { ascending: false }).limit(2);
-    console.log("Query 'start_time' Error:", e1?.message);
-    const { data: d2, error: e2 } = await supabase.from("interview_sessions").select("*").order("created_at", { ascending: false }).limit(2);
-    console.log("Query 'created_at' Error:", e2?.message);
-})();
+require('dotenv').config();
+const supabase = require('./config/db');
+
+async function testInsert() {
+    const testData = {
+        user_id: 'test_user_' + Date.now(),
+        raw_text: 'Test resume content',
+        summary: 'Test summary',
+        skills: ['testing'],
+        experience_years: 5,
+        primary_role: 'Tester',
+        education: 'Test University',
+        key_projects: ['Test Project']
+    };
+
+    console.log("Attempting insert into 'resumes' table...");
+    const { data, error } = await supabase.from('resumes').insert(testData).select();
+
+    if (error) {
+        console.error("INSERT FAILED:");
+        console.error(error);
+        if (error.code === '42P01') {
+            console.error("HINT: The 'resumes' table might not exist.");
+        }
+    } else {
+        console.log("INSERT SUCCESS:");
+        console.log(data);
+        
+        // Clean up
+        await supabase.from('resumes').delete().eq('id', data[0].id);
+        console.log("CLEANUP SUCCESS");
+    }
+}
+
+testInsert();

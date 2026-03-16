@@ -18,13 +18,13 @@ export default function AppLayout({ devMode = false }) {
                     flex: 1,
                     maxWidth: 1280,
                     margin: '0 auto',
-                    padding: '48px 32px 80px',
+                    padding: '48px 32px 32px',
                     width: '100%',
                 }}
             >
                 <Outlet />
             </motion.main>
-            <Footer />
+            {location.pathname !== '/copilot' && <Footer />}
         </div>
     )
 }

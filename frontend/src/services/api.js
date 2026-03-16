@@ -6,6 +6,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 const api = axios.create({
     baseURL: BASE_URL,
     timeout: 120000,
+    withCredentials: true
 })
 
 // Token injector — call this once from a component with Clerk auth
@@ -44,42 +45,42 @@ export const resumeApi = {
     upload: (formData, onProgress) => {
         return api.post('/resume/upload', formData, {
             onUploadProgress: (e) => onProgress?.(Math.round((e.loaded / e.total) * 100)),
-            timeout: 120000, // 2 min timeout for large files + AI analysis
-        })
+            timeout: 120000,
+        }).then(res => res.data)
     },
-    get: (id = 'latest') => api.get(`/resume/${id}`),
-    list: () => api.get('/resume/list'),
-    delete: (id) => api.delete(`/resume/${id}`),
-    touch: (id) => api.put(`/resume/${id}/touch`),
+    get: (id = 'latest') => api.get(`/resume/${id}`).then(res => res.data),
+    list: () => api.get('/resume/list').then(res => res.data),
+    delete: (id) => api.delete(`/resume/${id}`).then(res => res.data),
+    touch: (id) => api.put(`/resume/${id}/touch`).then(res => res.data),
 }
 
 // ── Interviews ───────────────────────────────────────────────
 export const interviewApi = {
-    create: (payload) => api.post('/interview/start', payload),
-    get: (id) => api.get(`/interview/${id}`),
-    list: (params) => api.get('/interview', { params }),
-    submit: (id, ans) => api.post(`/interview/${id}/submit-answer`, ans),
-    end: (id) => api.post(`/interview/${id}/end`),
+    create: (payload) => api.post('/interview/start', payload).then(res => res.data),
+    get: (id) => api.get(`/interview/${id}`).then(res => res.data),
+    list: (params) => api.get('/interview', { params }).then(res => res.data),
+    submit: (id, ans) => api.post(`/interview/${id}/submit-answer`, ans).then(res => res.data),
+    end: (id) => api.post(`/interview/${id}/end`).then(res => res.data),
 }
 
 // ── Results ──────────────────────────────────────────────────
 export const resultsApi = {
-    get: (id) => api.get(`/interview/${id}/results`),
+    get: (id) => api.get(`/interview/${id}/results`).then(res => res.data),
 }
 
 // ── Analytics ────────────────────────────────────────────────
 export const analyticsApi = {
-    get: () => api.get('/analytics'),
+    get: () => api.get('/analytics').then(res => res.data),
 }
 
 // ── Chat / Copilot ───────────────────────────────────────────
 export const chatApi = {
-    sessions: () => api.get('/chat/sessions'),
-    createSession: (title) => api.post('/chat/sessions', { title }),
-    deleteSession: (id) => api.delete(`/chat/sessions/${id}`),
-    send: (msg, sessionId) => api.post('/chat/message', { message: msg, sessionId }),
-    history: (sessionId) => api.get('/chat/history', { params: { sessionId } }),
-    quickAction: (type, sessionId) => api.post('/chat/quick-action', { action: type, sessionId }),
+    sessions: () => api.get('/chat/sessions').then(res => res.data),
+    createSession: (title) => api.post('/chat/sessions', { title }).then(res => res.data),
+    deleteSession: (id) => api.delete(`/chat/sessions/${id}`).then(res => res.data),
+    send: (msg, sessionId) => api.post('/chat/message', { message: msg, sessionId }).then(res => res.data),
+    history: (sessionId) => api.get('/chat/history', { params: { sessionId } }).then(res => res.data),
+    quickAction: (type, sessionId) => api.post('/chat/quick-action', { action: type, sessionId }).then(res => res.data),
 }
 
 export default api

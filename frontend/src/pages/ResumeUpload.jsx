@@ -38,7 +38,7 @@ export default function ResumeUpload() {
     const fetchResumes = useCallback(async () => {
         try {
             const res = await resumeApi.list()
-            setResumes(res.data || [])
+            setResumes(res || [])
         } catch (e) {
             console.error('Failed to fetch resumes', e)
         }
@@ -82,7 +82,7 @@ export default function ResumeUpload() {
         fd.append('resume', f)
         try {
             const res = await resumeApi.upload(fd, (pct) => setProgress(pct))
-            setResult(res.data)
+            setResult(res)
             fetchResumes()
         } catch (e) {
             setError(e.message || 'Upload failed.')
@@ -145,7 +145,7 @@ export default function ResumeUpload() {
                         <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, color: 'var(--emerald)', fontWeight: 600 }}>Resume analysed</p>
                         <p style={{ fontFamily: 'Fira Code, monospace', fontSize: 11, color: 'var(--text-2)', marginTop: 4, marginBottom: 16 }}>{file.name}</p>
                         <button
-                            onClick={(e) => { e.stopPropagation(); navigate('/start', { state: { role: result.primary_role } }); }}
+                            onClick={(e) => { e.stopPropagation(); navigate('/start', { state: { role: result.structured?.primary_role, resumeId: result.id } }); }}
                             style={{
                                 background: 'var(--accent)', color: '#000', border: 'none',
                                 padding: '8px 24px', borderRadius: 8, fontSize: 13,
@@ -180,17 +180,17 @@ export default function ResumeUpload() {
                 {result && (
                     <motion.div key="result" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} style={{ marginTop: 36 }}>
                         <Divider label="AI Analysis" />
-                        {result.summary && (
+                        {result.structured?.summary && (
                             <div style={{ marginBottom: 28 }}>
                                 <p style={MONO_LABEL}>Summary</p>
-                                <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, color: 'var(--text-1)', lineHeight: 1.7, marginTop: 10 }}>{result.summary}</p>
+                                <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 14, color: 'var(--text-1)', lineHeight: 1.7, marginTop: 10 }}>{result.structured.summary}</p>
                             </div>
                         )}
-                        {result.skills?.length > 0 && (
+                        {result.structured?.skills?.length > 0 && (
                             <div>
                                 <p style={MONO_LABEL}>Extracted Skills</p>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                                    {result.skills.map((s, i) => (
+                                    {result.structured.skills.map((s, i) => (
                                         <motion.span key={s} initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.03 }}
                                             style={{ padding: '5px 12px', borderRadius: 5, border: '1px solid var(--border)', fontFamily: 'Manrope, sans-serif', fontSize: 13, color: 'var(--text-1)', background: 'var(--bg-2)' }}>
                                             {s}
@@ -229,7 +229,7 @@ export default function ResumeUpload() {
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); navigate('/start', { state: { role: r.primary_role } }); }}
+                                        onClick={(e) => { e.stopPropagation(); navigate('/start', { state: { role: r.primary_role, resumeId: r.id } }); }}
                                         style={{ background: 'var(--bg-3)', color: 'var(--text-0)', border: '1px solid var(--border)', padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
                                     >
                                         <Play size={12} fill="currentColor" /> Practice

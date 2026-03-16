@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTheme } from '../../context/ThemeContext.jsx'
 
 const NAV_LINKS = [
+    { to: '/dashboard', label: 'Dashboard' },
     { to: '/resume', label: 'Resume' },
     { to: '/start', label: 'Interview' },
     { to: '/copilot', label: 'Copilot' },

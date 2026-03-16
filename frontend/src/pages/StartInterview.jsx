@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { interviewApi } from '../services/api.js'
+import { FileText, ChevronDown, ChevronUp, Upload, Loader2, Play } from 'lucide-react'
+import { interviewApi, resumeApi } from '../services/api.js'
 
 const ROLES = ['Frontend Engineer', 'Backend Engineer', 'Full Stack', 'Data Scientist', 'ML Engineer', 'DevOps', 'System Design', 'Product Manager']
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced', 'Expert']
@@ -27,14 +28,72 @@ export default function StartInterview() {
     const [role, setRole] = useState('Frontend Engineer')
     const [difficulty, setDifficulty] = useState('Intermediate')
     const [round, setRound] = useState('technical')
+    const [resumeId, setResumeId] = useState(null)
+    const [selectedResume, setSelectedResume] = useState(null)
+    const [allResumes, setAllResumes] = useState([])
+    const [showResumeSelector, setShowResumeSelector] = useState(false)
+    const [loadingResumes, setLoadingResumes] = useState(true)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState(null)
 
+    // Fetch all resumes for the selector
     useEffect(() => {
+        const fetchAllResumes = async () => {
+            try {
+                const list = await resumeApi.list()
+                setAllResumes(list || [])
+            } catch (err) {
+                console.error('Failed to fetch resumes list', err)
+            } finally {
+                setLoadingResumes(false)
+            }
+        }
+        fetchAllResumes()
+    }, [])
+
+    // Fetch selected resume details
+    useEffect(() => {
+        const fetchResume = async (id) => {
+            try {
+                const res = await resumeApi.get(id)
+                if (res) {
+                    setSelectedResume(res)
+                    setResumeId(res.id)
+                    if (res.primary_role && !location.state?.role) {
+                        setRole(res.primary_role)
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to fetch resume context', err)
+            }
+        }
+
+        if (location.state?.resumeId) {
+            setResumeId(location.state.resumeId)
+            fetchResume(location.state.resumeId)
+        } else {
+            // Fallback to latest
+            fetchResume('latest')
+        }
+
         if (location.state?.role) {
             setRole(location.state.role)
         }
     }, [location.state])
+
+    const handleSelectResume = async (resume) => {
+        try {
+            const fullResume = await resumeApi.get(resume.id)
+            setSelectedResume(fullResume)
+            setResumeId(fullResume.id)
+            if (fullResume.primary_role) {
+                setRole(fullResume.primary_role)
+            }
+            setShowResumeSelector(false)
+        } catch (err) {
+            console.error('Failed to select resume', err)
+        }
+    }
 
     const selectedRound = ROUNDS.find(r => r.id === round)
 
@@ -42,8 +101,13 @@ export default function StartInterview() {
         setLoading(true)
         setError(null)
         try {
-            const res = await interviewApi.create({ role, difficulty, round_type: round })
-            navigate(`/interview/${res.data.session_id}`)
+            const res = await interviewApi.create({
+                role,
+                difficulty,
+                round_type: round,
+                resume_id: resumeId || (selectedResume?.id)
+            })
+            navigate(`/interview/${res.interviewId}`)
         } catch (e) {
             setError(e.message || 'Failed to start. Please try again.')
             setLoading(false)
@@ -67,6 +131,203 @@ export default function StartInterview() {
 
                 {/* LEFT — Configuration */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
+
+                    {/* ── Resume Context Card ──────────────────────────── */}
+                    <motion.div variants={fadeUp}>
+                        <p style={labelStyle}>Resume Context</p>
+                        <div style={{ marginTop: 12, position: 'relative' }}>
+                            {selectedResume ? (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 8 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    style={{
+                                        border: '1px solid var(--amber)',
+                                        borderRadius: 10,
+                                        background: 'var(--amber-dim)',
+                                        overflow: 'hidden',
+                                    }}
+                                >
+                                    {/* Selected resume info */}
+                                    <div
+                                        onClick={() => allResumes.length > 1 && setShowResumeSelector(!showResumeSelector)}
+                                        style={{
+                                            padding: '14px 18px',
+                                            display: 'flex', alignItems: 'center', gap: 14,
+                                            cursor: allResumes.length > 1 ? 'pointer' : 'default',
+                                            transition: 'background 0.15s',
+                                        }}
+                                    >
+                                        <div style={{
+                                            width: 38, height: 38, borderRadius: 8,
+                                            background: 'var(--amber)', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                        }}>
+                                            <FileText size={18} color="var(--bg-0)" />
+                                        </div>
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{
+                                                fontFamily: 'Outfit, sans-serif', fontSize: 14, fontWeight: 600,
+                                                color: 'var(--text-0)', margin: 0,
+                                                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                            }}>
+                                                {selectedResume.primary_role || 'Resume'}
+                                            </p>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                                                <span style={{
+                                                    fontFamily: 'Fira Code, monospace', fontSize: 10,
+                                                    color: 'var(--amber)', letterSpacing: '0.05em',
+                                                }}>
+                                                    ACTIVE
+                                                </span>
+                                                <span style={{
+                                                    width: 3, height: 3, borderRadius: '50%',
+                                                    background: 'var(--text-2)', display: 'inline-block',
+                                                }} />
+                                                <span style={{
+                                                    fontFamily: 'Manrope, sans-serif', fontSize: 11,
+                                                    color: 'var(--text-2)',
+                                                }}>
+                                                    {selectedResume.experience_years ? `${selectedResume.experience_years} yrs exp` : 'Uploaded'} · {new Date(selectedResume.created_at).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        {allResumes.length > 1 && (
+                                            <motion.div
+                                                animate={{ rotate: showResumeSelector ? 180 : 0 }}
+                                                transition={{ duration: 0.2 }}
+                                            >
+                                                <ChevronDown size={16} style={{ color: 'var(--text-2)' }} />
+                                            </motion.div>
+                                        )}
+                                    </div>
+
+                                    {/* Skills preview */}
+                                    {selectedResume.skills?.length > 0 && (
+                                        <div style={{
+                                            padding: '0 18px 12px',
+                                            display: 'flex', flexWrap: 'wrap', gap: 5,
+                                        }}>
+                                            {selectedResume.skills.slice(0, 8).map((s, i) => (
+                                                <span key={i} style={{
+                                                    fontFamily: 'Manrope, sans-serif', fontSize: 10,
+                                                    color: 'var(--text-1)', background: 'var(--bg-2)',
+                                                    padding: '2px 8px', borderRadius: 4,
+                                                    border: '1px solid var(--border)',
+                                                }}>
+                                                    {s}
+                                                </span>
+                                            ))}
+                                            {selectedResume.skills.length > 8 && (
+                                                <span style={{
+                                                    fontFamily: 'Manrope, sans-serif', fontSize: 10,
+                                                    color: 'var(--text-2)', padding: '2px 6px',
+                                                }}>
+                                                    +{selectedResume.skills.length - 8} more
+                                                </span>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Resume selector dropdown */}
+                                    <AnimatePresence>
+                                        {showResumeSelector && allResumes.length > 1 && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: 'auto', opacity: 1 }}
+                                                exit={{ height: 0, opacity: 0 }}
+                                                transition={{ duration: 0.25 }}
+                                                style={{
+                                                    overflow: 'hidden',
+                                                    borderTop: '1px solid var(--border)',
+                                                    background: 'var(--bg-1)',
+                                                }}
+                                            >
+                                                <div style={{ padding: '8px 10px' }}>
+                                                    <p style={{
+                                                        fontFamily: 'Manrope, sans-serif', fontSize: 10,
+                                                        color: 'var(--text-2)', letterSpacing: '0.1em',
+                                                        textTransform: 'uppercase', margin: '4px 8px 8px',
+                                                    }}>
+                                                        Switch Resume
+                                                    </p>
+                                                    {allResumes
+                                                        .filter(r => r.id !== selectedResume.id)
+                                                        .map(r => (
+                                                            <motion.div
+                                                                key={r.id}
+                                                                onClick={() => handleSelectResume(r)}
+                                                                whileHover={{ background: 'var(--bg-3)' }}
+                                                                style={{
+                                                                    padding: '10px 12px', borderRadius: 6,
+                                                                    cursor: 'pointer', display: 'flex',
+                                                                    alignItems: 'center', gap: 10,
+                                                                    transition: 'background 0.15s',
+                                                                }}
+                                                            >
+                                                                <FileText size={14} style={{ color: 'var(--text-2)', flexShrink: 0 }} />
+                                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                                    <p style={{
+                                                                        fontFamily: 'Manrope, sans-serif', fontSize: 13,
+                                                                        color: 'var(--text-1)', margin: 0,
+                                                                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                                                    }}>
+                                                                        {r.primary_role || 'Resume'}
+                                                                    </p>
+                                                                    <p style={{
+                                                                        fontFamily: 'Manrope, sans-serif', fontSize: 11,
+                                                                        color: 'var(--text-2)', margin: '2px 0 0',
+                                                                    }}>
+                                                                        {new Date(r.created_at).toLocaleDateString()}
+                                                                    </p>
+                                                                </div>
+                                                            </motion.div>
+                                                        ))
+                                                    }
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    onClick={() => navigate('/resume')}
+                                    style={{
+                                        border: '1px dashed var(--border)', borderRadius: 10,
+                                        padding: '20px 18px', display: 'flex', alignItems: 'center',
+                                        gap: 14, cursor: 'pointer', background: 'var(--bg-1)',
+                                        transition: 'border-color 0.2s, background 0.2s',
+                                    }}
+                                >
+                                    <div style={{
+                                        width: 38, height: 38, borderRadius: 8,
+                                        background: 'var(--bg-3)', display: 'flex',
+                                        alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                                    }}>
+                                        <Upload size={16} style={{ color: 'var(--text-2)' }} />
+                                    </div>
+                                    <div>
+                                        <p style={{
+                                            fontFamily: 'Manrope, sans-serif', fontSize: 13, fontWeight: 500,
+                                            color: 'var(--text-1)', margin: 0,
+                                        }}>
+                                            {loadingResumes ? 'Loading resumes…' : 'No resume selected'}
+                                        </p>
+                                        <p style={{
+                                            fontFamily: 'Manrope, sans-serif', fontSize: 11,
+                                            color: 'var(--text-2)', margin: '3px 0 0',
+                                        }}>
+                                            Upload a resume for personalized questions
+                                        </p>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </div>
+                    </motion.div>
+
+                    {/* Divider */}
+                    <motion.div variants={fadeUp} style={{ height: 1, background: 'var(--border)' }} />
 
                     {/* Role */}
                     <motion.div variants={fadeUp}>
@@ -180,6 +441,7 @@ export default function StartInterview() {
                         </div>
 
                         <div style={{ padding: '20px' }}>
+                            <SummaryRow label="Resume" value={selectedResume ? (selectedResume.primary_role || 'Uploaded') : 'None'} highlight={!!selectedResume} />
                             <SummaryRow label="Role" value={role} />
                             <SummaryRow label="Difficulty" value={difficulty} />
                             <SummaryRow label="Round" value={selectedRound?.label} last />
@@ -195,7 +457,10 @@ export default function StartInterview() {
                                     transition={{ duration: 0.22 }}
                                     style={{ fontFamily: 'Manrope, sans-serif', fontSize: 12, color: 'var(--text-2)', marginBottom: 12 }}
                                 >
-                                    {selectedRound?.desc}
+                                    {selectedResume
+                                        ? `Questions will be personalized based on your ${selectedResume.primary_role || 'resume'} profile.`
+                                        : selectedRound?.desc
+                                    }
                                 </motion.p>
                             </AnimatePresence>
 
@@ -226,7 +491,7 @@ export default function StartInterview() {
                                 }}
                             >
                                 {loading ? (
-                                    <><Spinner /> Starting…</>
+                                    <><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ display: 'flex' }}><Loader2 size={16} /></motion.div> Starting…</>
                                 ) : (
                                     'Start Interview'
                                 )}
@@ -254,7 +519,7 @@ const pillStyle = (active) => ({
     boxShadow: active ? '0 0 12px var(--amber-glow)' : 'none',
 })
 
-function SummaryRow({ label, value, last }) {
+function SummaryRow({ label, value, last, highlight }) {
     return (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '10px 0', borderBottom: last ? 'none' : '1px solid var(--border)' }}>
             <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 12, color: 'var(--text-2)' }}>{label}</span>
@@ -265,8 +530,19 @@ function SummaryRow({ label, value, last }) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.18 }}
-                    style={{ fontFamily: 'Manrope, sans-serif', fontSize: 13, fontWeight: 500, color: 'var(--text-0)' }}
+                    style={{
+                        fontFamily: 'Manrope, sans-serif', fontSize: 13, fontWeight: 500,
+                        color: highlight ? 'var(--amber)' : 'var(--text-0)',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                    }}
                 >
+                    {highlight && (
+                        <span style={{
+                            width: 5, height: 5, borderRadius: '50%',
+                            background: 'var(--amber)', display: 'inline-block',
+                            boxShadow: '0 0 6px var(--amber-glow)',
+                        }} />
+                    )}
                     {value}
                 </motion.span>
             </AnimatePresence>

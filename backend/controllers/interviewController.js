@@ -2,14 +2,19 @@ const { generateQuestion, scoreAnswer, generateInterviewSummary } = require("../
 const supabase = require("../config/db");
 
 // Helper: get user's resume context for personalized questions
-async function getResumeContext(userId) {
-    const { data } = await supabase
+async function getResumeContext(userId, resumeId = null) {
+    let query = supabase
         .from("resumes")
         .select("summary, skills, primary_role, experience_years")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+        .eq("user_id", userId);
+
+    if (resumeId) {
+        query = query.eq("id", resumeId);
+    } else {
+        query = query.order("created_at", { ascending: false }).limit(1);
+    }
+
+    const { data } = await query.single();
 
     if (!data) return "";
     return `${data.primary_role} with ${data.experience_years} years experience. Skills: ${(data.skills || []).join(", ")}. ${data.summary}`;
@@ -17,11 +22,11 @@ async function getResumeContext(userId) {
 
 exports.startInterview = async (req, res) => {
     try {
-        const { role, difficulty, round_type = "technical" } = req.body;
+        const { role, difficulty, round_type = "technical", resume_id } = req.body;
         if (!role || !difficulty) return res.status(400).json({ message: "role and difficulty are required" });
 
         const { userId } = typeof req.auth === 'function' ? req.auth() : req.auth;
-        const resumeContext = await getResumeContext(userId);
+        const resumeContext = await getResumeContext(userId, resume_id);
 
         // Create interview session in Supabase
         const { data: session, error: sessionErr } = await supabase
@@ -31,7 +36,7 @@ exports.startInterview = async (req, res) => {
                 role,
                 difficulty,
                 round_type,
-                status: "in_progress",
+                status: "ongoing",
                 resume_context: resumeContext,
             })
             .select()
@@ -39,9 +44,19 @@ exports.startInterview = async (req, res) => {
 
         if (sessionErr) throw sessionErr;
 
+        // Mixed round logic for first question
+        let actualRoundType = round_type;
+        if (round_type === 'mixed') {
+            const rand = Math.random();
+            if (rand < 0.4) actualRoundType = 'technical';
+            else if (rand < 0.8) actualRoundType = 'coding';
+            else actualRoundType = 'behavioural';
+            console.log(`[HTTP] Mixed round: Picked ${actualRoundType} for first question`);
+        }
+
         // Generate first question
         const questionData = await generateQuestion({
-            role, difficulty, roundType: round_type, resumeContext,
+            role, difficulty, roundType: actualRoundType, resumeContext,
         });
 
         // Save question to Supabase
@@ -49,12 +64,18 @@ exports.startInterview = async (req, res) => {
             .from("questions")
             .insert({
                 interview_id: session.id,
-                content: questionData.question,
-                type: questionData.type,
-                hint: questionData.hint,
-                expected_topics: questionData.expected_topics,
-                time_limit_seconds: questionData.time_limit_seconds,
+                content: questionData.question || questionData.description || questionData.title,
+                type: questionData.type || (actualRoundType === 'coding' ? 'coding' : 'theory'),
+                hint: questionData.hint || "",
+                expected_topics: questionData.expected_topics || questionData.topics || [],
+                time_limit_seconds: questionData.time_limit_seconds || 600,
                 question_number: 1,
+                // Coding specific metadata
+                title: questionData.title,
+                description: questionData.description,
+                constraints: questionData.constraints,
+                examples: questionData.examples,
+                hidden_test_cases: questionData.hidden_test_cases
             })
             .select()
             .single();
@@ -139,7 +160,7 @@ exports.submitAnswer = async (req, res) => {
             return res.status(403).json({ message: "Access denied" });
         }
 
-        const { role, difficulty, round_type } = question.interview_sessions;
+        const { role, difficulty, round_type, resume_context } = question.interview_sessions;
 
         // Score with AI
         const evaluation = await scoreAnswer({
@@ -160,35 +181,76 @@ exports.submitAnswer = async (req, res) => {
             topics_missed: evaluation.topics_missed,
         }).eq("id", question_id);
 
-        // Get all questions to decide if we should generate next question
+        // Get session question count
         const { data: allQuestions } = await supabase
             .from("questions")
             .select("content, score")
-            .eq("interview_id", question.interview_id)
-            .order("question_number", { ascending: true });
+            .eq("interview_id", question.interview_id);
 
-        const unanswered = allQuestions.filter((q) => q.score == null);
         const questionCount = allQuestions.length;
+
+        // Define limits per round type
+        const roundLimits = { technical: 4, coding: 2, behavioural: 3, behavioral: 3, mixed: 4 };
+        const limit = roundLimits[round_type] || 4;
 
         let nextQuestion = null;
 
-        // Continue interview up to 5 questions
-        if (questionCount < 5) {
+        // Decide: Follow up or Next Question?
+        if (questionCount < limit) {
             const previousQuestions = allQuestions.map((q) => q.content);
-            const resumeContext = await getResumeContext(userId);
+            const context = resume_context || await getResumeContext(userId);
+
+            let followUpContext = null;
+            let guidance = null;
+
+            if (evaluation.score < 4) {
+                // Score < 4 -> Hint-based follow-up
+                guidance = "The candidate's answer was weak or incorrect. Ask a leading follow-up question or provide a hint to help them find the right path.";
+            } else if (evaluation.score <= 7) {
+                // Score 4–7 -> Deeper technical question
+                guidance = "The candidate has a basic understanding. Ask a deeper technical follow-up to test the limits of their knowledge on this topic.";
+            }
+
+            if (guidance) {
+                followUpContext = {
+                    question: question.content,
+                    answer,
+                    score: evaluation.score,
+                    guidance
+                };
+            }
+
+            // Mixed round logic for next topic (if not a follow-up)
+            let actualRoundType = round_type;
+            if (!followUpContext && round_type === 'mixed') {
+                const rand = Math.random();
+                if (rand < 0.4) actualRoundType = 'technical';
+                else if (rand < 0.8) actualRoundType = 'coding';
+                else actualRoundType = 'behavioural';
+            }
 
             const nextQData = await generateQuestion({
-                role, difficulty, roundType: round_type, resumeContext, previousQuestions,
+                role,
+                difficulty,
+                roundType: actualRoundType,
+                resumeContext: context,
+                previousQuestions,
+                followUpContext
             });
 
             const { data: nq } = await supabase.from("questions").insert({
                 interview_id: question.interview_id,
-                content: nextQData.question,
-                type: nextQData.type,
-                hint: nextQData.hint,
-                expected_topics: nextQData.expected_topics,
-                time_limit_seconds: nextQData.time_limit_seconds,
+                content: nextQData.question || nextQData.description || nextQData.title,
+                type: nextQData.type || (actualRoundType === 'coding' ? 'coding' : 'theory'),
+                hint: nextQData.hint || "",
+                expected_topics: nextQData.expected_topics || nextQData.topics || [],
+                time_limit_seconds: nextQData.time_limit_seconds || 600,
                 question_number: questionCount + 1,
+                title: nextQData.title,
+                description: nextQData.description,
+                constraints: nextQData.constraints,
+                examples: nextQData.examples,
+                hidden_test_cases: nextQData.hidden_test_cases
             }).select().single();
 
             nextQuestion = {
@@ -264,9 +326,10 @@ exports.endInterview = async (req, res) => {
         if (error) throw error;
 
         const scored = questions.filter((q) => q.score != null);
-        const totalScore = scored.length
-            ? Math.round(scored.reduce((s, q) => s + q.score, 0) / scored.length)
+        const avgScore = scored.length
+            ? (scored.reduce((s, q) => s + q.score, 0) / scored.length)
             : 0;
+        const totalScore = Math.round(avgScore * 10); // Scale 0-10 to 0-100
 
         const { data: session } = await supabase
             .from("interview_sessions")
@@ -289,6 +352,7 @@ exports.endInterview = async (req, res) => {
             ai_feedback_summary: summary.ai_feedback_summary,
             weak_topics: summary.weak_topics,
             recommendation: summary.recommendation,
+            // Strengths and study suggestions can be stored in metadata or JSON columns if exist
         }).eq("id", req.params.id);
 
         res.json({ message: "Interview completed", total_score: totalScore, summary });

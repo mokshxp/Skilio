@@ -179,7 +179,12 @@ export default function InterviewRoom() {
 
                         {phase === 'question' && currentQuestion && (
                             <motion.div key={currentQuestion.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                                <QuestionPanel q={currentQuestion} />
+                                <div className="mb-6">
+                                    <p className="label mb-3" style={{ color: 'var(--amber)', letterSpacing: '0.05em' }}>AI Interviewer Question</p>
+                                    <div className="p-4 rounded-xl border" style={{ background: 'var(--bg-3)', borderColor: 'var(--border)' }}>
+                                        <QuestionPanel q={currentQuestion} />
+                                    </div>
+                                </div>
                             </motion.div>
                         )}
 
@@ -199,21 +204,45 @@ export default function InterviewRoom() {
                 transition={{ delay: 0.25, duration: 0.4 }}
                 className="flex-1 flex flex-col overflow-hidden"
             >
-                {isCoding ? (
-                    <CodingPanel
-                        code={code} setCode={setCode} language={language} setLanguage={setLanguage}
-                        output={output} running={running} submitting={submitting}
-                        onRun={runCode} onSubmit={submitAnswer}
-                        question={currentQuestion}
-                    />
-                ) : (
-                    <TheoryPanel
-                        answer={answer} setAnswer={setAnswer}
-                        submitting={submitting} onSubmit={submitAnswer}
-                        phase={phase}
-                    />
-                )}
+                <div className="flex-1 px-8 py-6 flex flex-col gap-6 overflow-y-auto">
+                    <div>
+                        <p className="label mb-3" style={{ color: 'var(--sky)', letterSpacing: '0.05em' }}>Your Answer</p>
+                        {isCoding ? (
+                            <CodingPanel
+                                code={code} setCode={setCode} language={language} setLanguage={setLanguage}
+                                output={output} running={running} submitting={submitting}
+                                onRun={runCode} onSubmit={submitAnswer}
+                                question={currentQuestion}
+                            />
+                        ) : (
+                            <TheoryPanel
+                                answer={answer} setAnswer={setAnswer}
+                                submitting={submitting} onSubmit={submitAnswer}
+                                phase={phase}
+                            />
+                        )}
+                    </div>
+                </div>
             </motion.div>
+
+            {/* Reconnecting Overlay */}
+            <AnimatePresence>
+                {wsStatus === 'disconnected' && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center backdrop-blur-md"
+                        style={{ background: 'rgba(0,0,0,0.6)' }}
+                    >
+                        <div className="bg-white/10 p-8 rounded-2xl border border-white/20 text-center shadow-2xl">
+                            <Spinner size={32} className="mx-auto mb-4" />
+                            <h3 className="text-xl font-bold mb-2">Connection Lost</h3>
+                            <p className="text-sm opacity-80">Relaunching secure connection... Stand by.</p>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

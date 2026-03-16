@@ -32,7 +32,7 @@ exports.uploadResume = async (req, res) => {
         const parsed = await analyzeResume(extractedText);
         console.log("✅ AI analysis complete:", JSON.stringify(parsed).substring(0, 300));
 
-        const { error } = await supabase
+        const { data: insertedResume, error } = await supabase
             .from("resumes")
             .insert({
                 user_id: userId,
@@ -43,17 +43,20 @@ exports.uploadResume = async (req, res) => {
                 primary_role: parsed.primary_role,
                 education: parsed.education,
                 key_projects: parsed.key_projects
-            });
+            })
+            .select()
+            .single();
 
         if (error) {
             console.error("❌ Supabase insert error:", error);
             return res.status(500).json({ error: "Failed to save resume to database" });
         }
 
-        console.log("✅ Resume saved to database for user:", userId);
+        console.log("✅ Resume saved to database for user:", userId, "ID:", insertedResume.id);
 
         return res.json({
             success: true,
+            id: insertedResume.id,
             userId,
             textLength: extractedText.length,
             preview: extractedText.substring(0, 500),

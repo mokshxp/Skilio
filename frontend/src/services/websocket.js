@@ -20,16 +20,20 @@ class InterviewWebSocket {
     }
 
     _open(token) {
-        // Token sent via first message, NOT in URL (avoids logging in server/proxy/browser history)
-        const url = `${WS_BASE}/ws/interview/${this.sessionId}`
+        // Path updated to /interview/
+        const url = `${WS_BASE}/ws-interview/${this.sessionId}`
         this.socket = new WebSocket(url)
 
         this.socket.onopen = () => {
-            console.log('[WS] Connected to session', this.sessionId)
+            console.log('[WS] Connection opened successfully for session:', this.sessionId)
             // Authenticate via first message instead of URL query param
             if (token) {
+                console.log('[WS] Sending auth token...')
                 this._send({ type: 'auth', token })
             }
+            // Request first question immediately
+            console.log('[WS] Requesting first question...')
+            this._send({ type: 'start_interview', interviewId: this.sessionId })
             this.reconnectCount = 0
             this._emit('connected', { sessionId: this.sessionId })
             this._startPing()
@@ -38,25 +42,27 @@ class InterviewWebSocket {
         this.socket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data)
+                console.log('[WS] Message received:', data.type, data)
                 this._emit(data.type || 'message', data)
                 this._emit('any', data)
-            } catch {
+            } catch (err) {
+                console.warn('[WS] Raw message (not JSON):', event.data)
                 this._emit('raw', event.data)
             }
         }
 
         this.socket.onerror = (err) => {
-            console.error('[WS] Error', err)
+            console.error('[WS] WebSocket Error detail:', err)
             this._emit('error', err)
         }
 
         this.socket.onclose = (ev) => {
-            console.warn('[WS] Closed', ev.code)
+            console.warn(`[WS] Connection closed. Code: ${ev.code}, Reason: ${ev.reason || 'none'}, WasClean: ${ev.wasClean}`)
             this._stopPing()
-            this._emit('disconnected', { code: ev.code })
+            this._emit('disconnected', { code: ev.code, reason: ev.reason })
             if (this.shouldReconnect && this.reconnectCount < MAX_RECONNECTS) {
                 this.reconnectCount++
-                console.log(`[WS] Reconnecting attempt ${this.reconnectCount}/${MAX_RECONNECTS}`)
+                console.log(`[WS] Scheduling reconnect ${this.reconnectCount}/${MAX_RECONNECTS} in ${RECONNECT_DELAY_MS * this.reconnectCount}ms`)
                 setTimeout(() => this._open(token), RECONNECT_DELAY_MS * this.reconnectCount)
             }
         }

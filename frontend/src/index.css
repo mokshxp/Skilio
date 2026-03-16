@@ -45,7 +45,9 @@
 
     --rose: #FB7185;
     --rose-glow: rgba(251, 113, 133, 0.18);
+
 }
+
 
 /* ── MIDNIGHT LAB ─────────────────────────────────────────── */
 :root[data-theme="midnight"] {

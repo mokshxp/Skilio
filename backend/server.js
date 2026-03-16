@@ -12,6 +12,9 @@ const chatRoutes = require("./routes/chatRoutes");
 
 const { clerkMiddleware } = require("@clerk/express");
 
+const http = require("http");
+const { setupWebSocket } = require("./services/websocketService");
+
 const app = express();
 
 // ── Security Headers ─────────────────────────────────────────
@@ -26,7 +29,10 @@ const allowedOrigins = [
 ];
 app.use(cors({
     origin: (origin, cb) => {
-        if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+        if (!origin || allowedOrigins.includes(origin) || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+            return cb(null, true);
+        }
+        console.warn(`[CORS] Rejected origin: ${origin}`);
         cb(new Error("Not allowed by CORS"));
     },
     credentials: true,
@@ -38,7 +44,7 @@ app.use(express.json({ limit: "1mb" }));
 // ── Rate Limiting ────────────────────────────────────────────
 const generalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
+    max: 500,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: "Too many requests, please try again later." },
@@ -48,7 +54,7 @@ app.use(generalLimiter);
 // Stricter limits for AI-powered endpoints (cost protection)
 const aiLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 20,
+    max: 60,
     message: { error: "AI rate limit reached. Please wait before retrying." },
 });
 app.use("/chat", aiLimiter);
@@ -58,7 +64,7 @@ app.use("/coding", aiLimiter);
 // Strict limit for uploads
 const uploadLimiter = rateLimit({
     windowMs: 60 * 1000,
-    max: 50, // Temporarily increased to 50 so they don't get blocked
+    max: 100,
     message: { error: "Upload rate limit reached. Please wait before retrying." },
 });
 app.use("/resume", uploadLimiter);
@@ -92,8 +98,13 @@ app.use((err, req, res, next) => {
     });
 });
 
+
+const server = http.createServer(app);
+setupWebSocket(server);
+
 const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     require('express-list-endpoints')(app).forEach(r => console.log(r.path, r.methods));
 });
+
