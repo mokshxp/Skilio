@@ -1,16 +1,16 @@
-# 🚂 Railway Deployment Guide: Skilio
+# 🚂 Railway Backend Deployment: Skilio
 
-This guide explains how to deploy your **Skilio AI Interview Coach** on [Railway](https://railway.app/). We will create two services: one for the backend and one for the frontend.
+This guide focuses purely on deploying the **Skilio Backend** (Express API) on [Railway](https://railway.app/).
 
 ---
 
-## 🛠 Phase 1: Push Your Code to GitHub
-Your code must be on GitHub so Railway can pull it.
+## 🛠 Phase 1: Push Code to GitHub
+Railway builds directly from your repository.
 
 1.  **Terminal Check**: Run these in the `skilio` root folder:
     ```powershell
     git add .
-    git commit -m "chore: railway deployment setup"
+    git commit -m "chore: prepare backend for railway"
     git push origin main
     ```
 
@@ -18,42 +18,38 @@ Your code must be on GitHub so Railway can pull it.
 
 ## 🧠 Phase 2: Deploy the Backend
 1.  **Railway Dashboard**: Click **"New"** → **"GitHub Repo"**.
-2.  **Select your repo**.
-3.  **Choose "Manual"** setup when prompted (or just wait for it to create).
-4.  **Service Settings**:
-    *   **Name**: `skilio-backend`
-    *   **Root Directory**: `backend`
-    *   **Watch Patterns**: `/backend`
-5.  **Variables**: Add ALL values from your [backend/.env](file:///d:/skilio/backend/.env):
-    *   `DATABASE_URL`
-    *   `CLERK_SECRET_KEY`
-    *   `NVIDIA_API_KEY`
-    *   `SUPABASE_URL`
-    *   `SUPABASE_SERVICE_ROLE_KEY`
-    *   `PORT`: `8000`
-6.  **Railway Link**: Railway will give you a domain (e.g., `skilio-production.up.railway.app`). **Copy it.**
+2.  **Select your repo** (`Skilio-AI-Interview-Coach`).
+3.  **Service Settings** (Click the service box once it's created):
+    *   **Settings Tab**:
+        *   **Source**: Ensure it's pointing to your `main` branch.
+        *   **Root Directory**: Set this to `backend`.
+        *   **Watch Patterns**: Put `/backend/**` here.
+4.  **Variables Tab**: Add these EXACT keys from your [backend/.env](file:///d:/skilio/backend/.env):
+    *   `DATABASE_URL` (Your Supabase connection string)
+    *   `CLERK_SECRET_KEY` (Your Clerk secret key)
+    *   `NVIDIA_API_KEY` (Your NVIDIA AI API key)
+    *   `SUPABASE_URL` (Your Supabase project URL)
+    *   `SUPABASE_SERVICE_ROLE_KEY` (Your Supabase service role key)
+    *   `PORT`: `8000` (Railway will use this to listen for traffic)
+5.  **Domain**:
+    *   Go to the **Settings** tab.
+    *   Click **"Generate Domain"** (or add your own).
+    *   **Copy this URL** (e.g., `https://skilio-backend.up.railway.app`).
 
 ---
 
-## 🎨 Phase 3: Deploy the Frontend
-1.  **Railway Dashboard**: Go back to your project and click **"New"** → **"GitHub Repo"**.
-2.  **Select the SAME repo**.
-3.  **Service Settings**:
-    *   **Name**: `skilio-frontend`
-    *   **Root Directory**: `./` (Root)
-    *   **Build Command**: `npm run build`
-    *   **Start Command**: `npx serve -s dist`
-4.  **Variables**:
-    *   `VITE_API_URL`: **Paste the Backend Domain from Step 2 here.**
-    *   `VITE_CLERK_PUBLISHABLE_KEY`: (From your frontend dashboard).
-5.  **Install `serve`**: Since Vite produces static files, we need a small server to host them. I'll add `serve` to your package.json dependencies now.
+## 🎨 Phase 3: Linking your Frontend (e.g., Vercel)
+Once the backend is live, you need to tell your frontend where it is.
+
+1.  Go to your **Frontend deployment** (e.g., Vercel or your local `.env`).
+2.  Update `VITE_API_URL` to the **Railway URL** you just copied.
+    *   *Example:* `VITE_API_URL=https://skilio-backend.up.railway.app`
 
 ---
 
-## 🚀 Troubleshooting
-*   If the frontend doesn't load, check the **Variables** to ensure the backend URL includes `https://`.
-*   Railway automatically handles SSL, so your links will be secure by default.
+## ✅ Final Check
+*   Check the **Railway Logs** (Deployments → View Logs).
+*   If you see `Server running on port 8000`, your "brain" is live! 🧠🚀
 
 ---
-
-**Good luck on the tracks!** 🚂💨
+**Happy Deploying!** 🚂💨
