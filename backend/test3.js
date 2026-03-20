@@ -1,6 +1,7 @@
+require('dotenv').config();
 const axios = require('axios');
 const url = 'https://integrate.api.nvidia.com/v1/chat/completions';
-const key = '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';
+const key = process.env.NVIDIA_API_KEY;
 
 [
     'qwen/qwen2.5-72b-instruct',

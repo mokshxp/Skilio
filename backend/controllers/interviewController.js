@@ -415,7 +415,7 @@ exports.listSessions = async (req, res) => {
             .from("interview_sessions")
             .select("*")
             .eq("user_id", userId)
-            .order("created_at", { ascending: false })
+            .order("start_time", { ascending: false })
             .limit(limit);
 
         if (error) throw error;

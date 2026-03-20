@@ -4,7 +4,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 async function testQuestions() {
     // Get the last test session
-    const { data: session } = await supabase.from('interview_sessions').select('id').order('created_at', { ascending: false }).limit(1).single();
+    const { data: session } = await supabase.from('interview_sessions').select('id').order('start_time', { ascending: false }).limit(1).single();
 
     if (!session) return console.error("No session found");
 
