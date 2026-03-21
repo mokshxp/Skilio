@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8001'
 
 // Create base instance
 const api = axios.create({
@@ -54,13 +54,18 @@ export const resumeApi = {
     touch: (id) => api.put(`/resume/${id}/touch`).then(res => res.data),
 }
 
-// ── Interviews ───────────────────────────────────────────────
+// ── Interviews (V2) ─────────────────────────────────────────
 export const interviewApi = {
     create: (payload) => api.post('/interview/start', payload).then(res => res.data),
-    get: (id) => api.get(`/interview/${id}`).then(res => res.data),
+    get: (id) => {
+        const cleanId = id.toString().replace('sess_', '');
+        return api.get(`/interview/session/${cleanId}`).then(res => res.data);
+    },
     list: (params) => api.get('/interview', { params }).then(res => res.data),
-    submit: (id, ans) => api.post(`/interview/${id}/submit-answer`, ans).then(res => res.data),
-    end: (id) => api.post(`/interview/${id}/end`).then(res => res.data),
+    completeRound: (id, payload) => api.post(`/interview/round/complete`, { ...payload, interviewId: id }).then(res => res.data),
+    submitDSA: (payload) => api.post('/interview/dsa/submit', payload).then(res => res.data),
+    runDSA: (payload) => api.post('/interview/dsa/run', payload).then(res => res.data),
+    end: (id) => api.post('/interview/end', { interviewId: id }).then(res => res.data),
 }
 
 // ── Results ──────────────────────────────────────────────────
@@ -81,6 +86,15 @@ export const chatApi = {
     send: (msg, sessionId) => api.post('/chat/message', { message: msg, sessionId }).then(res => res.data),
     history: (sessionId) => api.get('/chat/history', { params: { sessionId } }).then(res => res.data),
     quickAction: (type, sessionId) => api.post('/chat/quick-action', { action: type, sessionId }).then(res => res.data),
+}
+
+// ── Sheets ───────────────────────────────────────────────────
+export const sheetsApi = {
+    list: (params) => api.get('/sheets/list', { params }).then(res => res.data),
+    get: (slug) => api.get(`/sheets/${slug}`).then(res => res.data),
+    getProgress: (id) => api.get(`/sheets/progress/${id}`).then(res => res.data),
+    updateProgress: (id, payload) => api.post(`/sheets/progress/${id}/complete`, payload).then(res => res.data),
+    toggleBookmark: (id, bookmarked) => api.post(`/sheets/progress/${id}/bookmark`, { bookmarked }).then(res => res.data),
 }
 
 export default api

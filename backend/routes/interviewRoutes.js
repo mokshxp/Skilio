@@ -2,15 +2,13 @@ const express = require("express");
 const router = express.Router();
 const interviewController = require("../controllers/interviewController");
 const authMiddleware = require("../middleware/authMiddleware");
-
 const { interviewSchemas } = require("../middleware/validator");
 
-router.get("/", authMiddleware, interviewSchemas.listSessions, interviewController.listSessions);
+// V2 interview routes
 router.post("/start", authMiddleware, interviewSchemas.startInterview, interviewController.startInterview);
-router.get("/:id", authMiddleware, interviewSchemas.getById, interviewController.getSession);
-router.post("/:id/next-round", authMiddleware, interviewSchemas.getById, interviewSchemas.startInterview, interviewController.nextRound);
-router.post("/:id/submit-answer", authMiddleware, interviewSchemas.getById, interviewSchemas.submitAnswer, interviewController.submitAnswer);
-router.post("/:id/end", authMiddleware, interviewSchemas.getById, interviewController.endInterview);
-router.get("/:id/results", authMiddleware, interviewSchemas.getById, interviewController.getResults);
+router.post("/round/complete", authMiddleware, interviewController.completeRound);
+router.post("/dsa/submit", authMiddleware, interviewController.submitDSA);
+router.post("/dsa/run", authMiddleware, interviewController.runDSA);
+router.get("/session/:id", authMiddleware, interviewController.getSession);
 
 module.exports = router;

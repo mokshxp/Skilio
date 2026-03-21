@@ -14,6 +14,10 @@ import Analytics from './pages/Analytics.jsx'
 import CareerCopilot from './pages/CareerCopilot.jsx'
 import Contact from './pages/Contact.jsx'
 import Terms from './pages/Terms.jsx'
+import Pricing from './pages/Pricing.jsx'
+import Billing from './pages/Billing.jsx'
+import Sheets from './pages/Sheets.jsx'
+import SheetDetail from './pages/SheetDetail.jsx'
 
 function ProtectedRoute({ children, devMode }) {
     if (devMode) return children
@@ -33,6 +37,7 @@ export default function App({ devMode = false }) {
                 <Route path="/" element={<LandingPage devMode={devMode} />} />
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route path="/pricing" element={<Pricing />} />
 
                 {/* Interview — immersive, no TopNav */}
                 <Route
@@ -58,6 +63,10 @@ export default function App({ devMode = false }) {
                     <Route path="/results/:id" element={<Results />} />
                     <Route path="/analytics" element={<Analytics />} />
                     <Route path="/copilot" element={<CareerCopilot />} />
+                    <Route path="/sheets" element={<Sheets />} />
+                    <Route path="/sheets/:slug" element={<SheetDetail />} />
+                    <Route path="/pricing" element={<Pricing />} />
+                    <Route path="/settings/billing" element={<Billing />} />
                 </Route>
 
                 <Route path="*" element={<Navigate to="/" replace />} />

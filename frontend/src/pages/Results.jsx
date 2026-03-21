@@ -4,6 +4,11 @@ import { motion } from 'framer-motion'
 import PageWrapper, { FadeUp } from '../components/layout/PageWrapper.jsx'
 import { resultsApi } from '../services/api.js'
 
+const SUBJECT_ICONS = {
+    CN: '📡', DBMS: '🗄️', OS: '⚙️', OOP: '🧱', DSA: '🧮',
+    HR: '🤝', SystemDesign: '🏗️',
+}
+
 export default function Results() {
     const { id } = useParams()
     const navigate = useNavigate()
@@ -26,7 +31,11 @@ export default function Results() {
     const rounds = data.rounds ?? []
     const weakTopics = data.weak_topics ?? []
     const aiSummary = data.ai_feedback_summary ?? ''
+    const questions = data.questions ?? []
     const scoreColor = score >= 75 ? 'var(--emerald)' : score >= 50 ? 'var(--amber)' : 'var(--rose)'
+
+    const correct = questions.filter(q => q.isCorrect).length
+    const wrong = questions.filter(q => q.isCorrect === false).length
 
     return (
         <PageWrapper>
@@ -67,6 +76,15 @@ export default function Results() {
                         {aiSummary && (
                             <p className="text-sm leading-relaxed mb-4" style={{ color: 'var(--text-1)' }}>{aiSummary}</p>
                         )}
+
+                        {/* Stats row */}
+                        <div className="flex gap-4 mb-4 flex-wrap">
+                            <StatBadge label="Questions" value={questions.length} color="var(--sky)" />
+                            <StatBadge label="Correct" value={correct} color="var(--emerald)" />
+                            <StatBadge label="Wrong" value={wrong} color="var(--rose)" />
+                            <StatBadge label="Role" value={data.role || '—'} color="var(--text-1)" />
+                        </div>
+
                         <div className="flex gap-3 flex-wrap">
                             <button className="btn-amber btn-md" onClick={() => navigate('/start')}>
                                 ↺ Retry Interview
@@ -75,10 +93,10 @@ export default function Results() {
                                 className="btn-outline btn-md"
                                 onClick={() => navigate('/copilot', { state: { context: `Explain my mistakes from interview ${id}` } })}
                             >
-                                🤖 Explain My Mistakes
+                                🤖 Explain Mistakes
                             </button>
                             <button className="btn-ghost btn-md" onClick={() => navigate('/analytics')}>
-                                📊 View Analytics
+                                📊 Analytics
                             </button>
                         </div>
                     </div>
@@ -97,39 +115,152 @@ export default function Results() {
                 </FadeUp>
             )}
 
-            {/* Weak Topics + Coding */}
-            <FadeUp>
-                <div className="grid md:grid-cols-2 gap-6">
-                    {weakTopics.length > 0 && (
-                        <div className="card-hover">
-                            <p className="label mb-3">Weak Topics Identified</p>
-                            <div className="flex flex-col gap-2">
-                                {weakTopics.map((t) => (
-                                    <div key={t.topic} className="flex items-center gap-3">
-                                        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--rose)' }} />
-                                        <span className="text-sm flex-1" style={{ color: 'var(--text-1)' }}>{t.topic}</span>
-                                        {t.score != null && (
-                                            <span className="mono-value text-xs">{t.score}</span>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
+            {/* Per-Question Breakdown */}
+            {questions.length > 0 && (
+                <FadeUp>
+                    <div>
+                        <p className="section-label mb-4">Question Breakdown</p>
+                        <div className="flex flex-col gap-3">
+                            {questions.map((q, i) => (
+                                <QuestionResultCard key={q.id || i} q={q} index={i} />
+                            ))}
+                        </div>
+                    </div>
+                </FadeUp>
+            )}
+
+            {/* Weak Topics */}
+            {weakTopics.length > 0 && (
+                <FadeUp>
+                    <div className="card-hover">
+                        <p className="label mb-3">Weak Topics Identified</p>
+                        <div className="flex flex-col gap-2">
+                            {weakTopics.map((t) => (
+                                <div key={t.topic} className="flex items-center gap-3">
+                                    <div className="w-2 h-2 rounded-full shrink-0" style={{ background: 'var(--rose)' }} />
+                                    <span className="text-sm flex-1" style={{ color: 'var(--text-1)' }}>{t.topic}</span>
+                                    {t.score != null && (
+                                        <span className="mono-value text-xs">{t.score}</span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </FadeUp>
+            )}
+        </PageWrapper>
+    )
+}
+
+function QuestionResultCard({ q, index }) {
+    const scoreColor = (q.score ?? 0) >= 7 ? 'var(--emerald)' : (q.score ?? 0) >= 4 ? 'var(--amber)' : 'var(--rose)'
+    const subjectIcon = SUBJECT_ICONS[q.subject] || '💡'
+
+    return (
+        <motion.div
+            initial={{ opacity: 0, x: -12 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: index * 0.06 }}
+            className="card-hover"
+            style={{ padding: '16px 20px' }}
+        >
+            <div className="flex items-start gap-4">
+                {/* Score circle */}
+                <div
+                    className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm"
+                    style={{
+                        fontFamily: 'Outfit, sans-serif',
+                        background: `${scoreColor}15`,
+                        color: scoreColor,
+                        border: `1px solid ${scoreColor}30`,
+                    }}
+                >
+                    {q.score ?? '—'}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                    {/* Tags row */}
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="text-xs font-bold" style={{
+                            fontFamily: 'Outfit, sans-serif', color: 'var(--text-2)',
+                        }}>
+                            Q{q.questionNumber || index + 1}
+                        </span>
+                        {q.subject && (
+                            <span className="badge-sky" style={{ fontSize: 10, padding: '2px 8px' }}>
+                                {subjectIcon} {q.subject}
+                            </span>
+                        )}
+                        {q.topic && (
+                            <span className="badge-muted" style={{ fontSize: 10, padding: '2px 8px' }}>
+                                {q.topic}
+                            </span>
+                        )}
+                        {q.type && (
+                            <span className="badge-amber" style={{ fontSize: 10, padding: '2px 8px', textTransform: 'uppercase' }}>
+                                {q.type}
+                            </span>
+                        )}
+                        <span style={{
+                            fontFamily: 'Fira Code, monospace', fontSize: 10,
+                            color: q.isCorrect ? 'var(--emerald)' : 'var(--rose)',
+                        }}>
+                            {q.isCorrect ? '✓ Correct' : '✗ Incorrect'}
+                        </span>
+                    </div>
+
+                    {/* Question text */}
+                    <p className="text-sm leading-relaxed mb-2" style={{ color: 'var(--text-0)' }}>
+                        {(q.content || '').substring(0, 200)}{(q.content || '').length > 200 ? '…' : ''}
+                    </p>
+
+                    {/* MCQ answer */}
+                    {q.options && q.correctAnswer && (
+                        <div className="flex gap-4 mb-2 text-xs" style={{ fontFamily: 'Fira Code, monospace' }}>
+                            <span style={{ color: 'var(--text-2)' }}>Answer: <span style={{ color: q.isCorrect ? 'var(--emerald)' : 'var(--rose)' }}>{q.answer}</span></span>
+                            {!q.isCorrect && (
+                                <span style={{ color: 'var(--text-2)' }}>Correct: <span style={{ color: 'var(--emerald)' }}>{q.correctAnswer}</span></span>
+                            )}
                         </div>
                     )}
 
-                    {data.coding_stats && (
-                        <div className="card-hover">
-                            <p className="label mb-3">Coding Performance</p>
-                            <div className="flex flex-col gap-3">
-                                <CodingStat label="Test Cases Passed" value={`${data.coding_stats.passed}/${data.coding_stats.total}`} color="var(--emerald)" />
-                                <CodingStat label="Avg Runtime" value={`${data.coding_stats.avg_ms}ms`} color="var(--sky)" />
-                                <CodingStat label="Correctness" value={`${data.coding_stats.correctness_pct}%`} color="var(--amber)" />
-                            </div>
+                    {/* Feedback */}
+                    {q.feedback && (
+                        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-2)' }}>
+                            {q.feedback}
+                        </p>
+                    )}
+
+                    {/* Improvements */}
+                    {q.improvements?.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                            {q.improvements.map((imp, i) => (
+                                <span key={i} className="text-xs" style={{
+                                    padding: '2px 8px', borderRadius: 4,
+                                    background: 'var(--bg-3)', color: 'var(--text-2)',
+                                    border: '1px solid var(--border)',
+                                }}>
+                                    → {imp}
+                                </span>
+                            ))}
                         </div>
                     )}
                 </div>
-            </FadeUp>
-        </PageWrapper>
+            </div>
+        </motion.div>
+    )
+}
+
+function StatBadge({ label, value, color }) {
+    return (
+        <div style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '4px 12px', borderRadius: 6,
+            background: 'var(--bg-3)', border: '1px solid var(--border)',
+        }}>
+            <span style={{ fontFamily: 'Outfit, sans-serif', fontSize: 14, fontWeight: 700, color }}>{value}</span>
+            <span style={{ fontFamily: 'Manrope, sans-serif', fontSize: 11, color: 'var(--text-2)' }}>{label}</span>
+        </div>
     )
 }
 
@@ -165,15 +296,6 @@ function RoundCard({ round, index }) {
                 <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-2)' }}>{round.feedback}</p>
             )}
         </motion.div>
-    )
-}
-
-function CodingStat({ label, value, color }) {
-    return (
-        <div className="flex items-center justify-between">
-            <span className="text-sm" style={{ color: 'var(--text-1)' }}>{label}</span>
-            <span className="font-bold text-sm" style={{ fontFamily: 'Fira Code, monospace', color }}>{value}</span>
-        </div>
     )
 }
 

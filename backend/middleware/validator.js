@@ -1,5 +1,6 @@
 const { body, query, param, validationResult } = require("express-validator");
 const sanitizeHtml = require("sanitize-html");
+const { apiLogger } = require("../services/logger");
 
 /**
  * Middleware to handle validation results
@@ -7,7 +8,13 @@ const sanitizeHtml = require("sanitize-html");
 const validate = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+        const errorArray = errors.array();
+        console.error('[Validation Error] 400 Bad Request:', errorArray);
+        // If apiLogger is available, use it
+        if (typeof apiLogger !== 'undefined') {
+            apiLogger.info(`[Validation Error] 400 Bad Request: ${JSON.stringify(errorArray)}`);
+        }
+        return res.status(400).json({ errors: errorArray });
     }
     next();
 };
@@ -71,23 +78,32 @@ const chatSchemas = {
 // ── Interview Validation ──────────────────────────────────────
 const interviewSchemas = {
     startInterview: [
-        body("role")
+        // Support both role and targetRole for compatibility
+        body(["role", "targetRole"])
+            .optional()
             .isString().withMessage("Role must be a string")
-            .trim().notEmpty().withMessage("Role is required")
-            .isLength({ max: 100 }).withMessage("Role too long")
-            .customSanitizer(sanitizeText),
+            .trim(),
         body("difficulty")
-            .isString().withMessage("Difficulty must be a string")
-            .isIn(['Junior', 'Intermediate', 'Senior', 'Entry Level', 'Advanced'])
+            .trim().notEmpty().withMessage("Difficulty is required")
+            .customSanitizer(v => v ? v.toLowerCase() : v)
+            .isIn(['beginner', 'intermediate', 'advanced', 'expert'])
             .withMessage("Invalid difficulty level"),
-        body("round_type")
-            .optional()
-            .isString().withMessage("Round type must be a string")
-            .isIn(['technical', 'coding', 'behavioural', 'behavioral', 'mixed', 'system_design'])
+        body("roundType")
+            .trim().notEmpty().withMessage("Round type is required")
+            .customSanitizer(v => v ? v.toLowerCase() : v)
+            .isIn(['technical', 'coding', 'behavioural', 'mixed', 'system_design'])
             .withMessage("Invalid round type"),
-        body("resume_id")
+        body("resumeId")
+            .optional({ nullable: true })
+            .custom((val) => {
+                if (!val) return true;
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (uuidRegex.test(val)) return true;
+                throw new Error("Invalid resumeId format");
+            }),
+        body("totalRounds")
             .optional()
-            .isUUID().withMessage("Invalid resume_id format"),
+            .isInt({ min: 1, max: 20 }).withMessage("totalRounds must be between 1 and 20"),
         validate
     ],
     submitAnswer: [

@@ -1,0 +1,966 @@
+{
+  "interview_questions": {
+    "required": [
+      "id",
+      "round_number",
+      "question_text",
+      "question_type",
+      "topic",
+      "difficulty"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "interview_id": {
+        "description": "Note:\nThis is a Foreign Key to `interviews.id`.<fk table='interviews' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "round_number": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "question_text": {
+        "format": "text",
+        "type": "string"
+      },
+      "question_type": {
+        "format": "text",
+        "type": "string"
+      },
+      "subject": {
+        "format": "text",
+        "type": "string"
+      },
+      "topic": {
+        "format": "text",
+        "type": "string"
+      },
+      "difficulty": {
+        "format": "text",
+        "type": "string"
+      },
+      "options": {
+        "format": "jsonb"
+      },
+      "correct_answer": {
+        "format": "text",
+        "type": "string"
+      },
+      "explanation": {
+        "format": "text",
+        "type": "string"
+      },
+      "created_at": {
+        "default": "now()",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "code_submissions": {
+    "required": [
+      "id"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "user_id": {
+        "format": "text",
+        "type": "string"
+      },
+      "problem_id": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "code": {
+        "format": "text",
+        "type": "string"
+      },
+      "language": {
+        "format": "text",
+        "type": "string"
+      },
+      "status": {
+        "format": "text",
+        "type": "string"
+      },
+      "score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "feedback": {
+        "format": "text",
+        "type": "string"
+      },
+      "runtime_estimate": {
+        "format": "text",
+        "type": "string"
+      },
+      "test_cases_passed": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "test_cases_total": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "improvements": {
+        "format": "jsonb"
+      },
+      "optimized_approach": {
+        "format": "text",
+        "type": "string"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "execution_logs": {
+    "required": [
+      "id",
+      "answer_id"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "answer_id": {
+        "description": "Note:\nThis is a Foreign Key to `user_answers.id`.<fk table='user_answers' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "execution_time_ms": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "memory_usage_kb": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "status": {
+        "enum": [
+          "success",
+          "failure",
+          "timeout"
+        ],
+        "format": "public.execution_status",
+        "type": "string"
+      },
+      "stdout": {
+        "format": "text",
+        "type": "string"
+      },
+      "stderr": {
+        "format": "text",
+        "type": "string"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "questions": {
+    "required": [
+      "id"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "interview_id": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "content": {
+        "format": "text",
+        "type": "string"
+      },
+      "type": {
+        "format": "text",
+        "type": "string"
+      },
+      "hint": {
+        "format": "text",
+        "type": "string"
+      },
+      "expected_topics": {
+        "format": "jsonb"
+      },
+      "time_limit_seconds": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "question_number": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "answer": {
+        "format": "text",
+        "type": "string"
+      },
+      "score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "feedback": {
+        "format": "text",
+        "type": "string"
+      },
+      "improvements": {
+        "format": "jsonb"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      },
+      "subject": {
+        "format": "text",
+        "type": "string"
+      },
+      "topic": {
+        "format": "text",
+        "type": "string"
+      },
+      "difficulty": {
+        "format": "text",
+        "type": "string"
+      },
+      "options": {
+        "format": "jsonb"
+      },
+      "correct_answer": {
+        "format": "text",
+        "type": "string"
+      },
+      "explanation": {
+        "format": "text",
+        "type": "string"
+      },
+      "is_correct": {
+        "format": "boolean",
+        "type": "boolean"
+      },
+      "time_taken_seconds": {
+        "format": "integer",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "coding_problems": {
+    "required": [
+      "id"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "interview_id": {
+        "description": "Note:\nThis is a Foreign Key to `interview_sessions.id`.<fk table='interview_sessions' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "problem_statement": {
+        "format": "text",
+        "type": "string"
+      },
+      "input_format": {
+        "format": "text",
+        "type": "string"
+      },
+      "output_format": {
+        "format": "text",
+        "type": "string"
+      },
+      "constraints": {
+        "format": "text",
+        "type": "string"
+      },
+      "visible_test_cases": {
+        "format": "jsonb"
+      },
+      "hidden_test_cases": {
+        "format": "jsonb"
+      },
+      "expected_time_complexity": {
+        "format": "character varying",
+        "maxLength": 100,
+        "type": "string"
+      },
+      "expected_space_complexity": {
+        "format": "character varying",
+        "maxLength": 100,
+        "type": "string"
+      },
+      "difficulty_level": {
+        "format": "character varying",
+        "maxLength": 50,
+        "type": "string"
+      },
+      "topic_tags": {
+        "format": "jsonb"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      },
+      "user_id": {
+        "format": "text",
+        "type": "string"
+      },
+      "title": {
+        "format": "text",
+        "type": "string"
+      },
+      "description": {
+        "format": "text",
+        "type": "string"
+      },
+      "starter_code": {
+        "format": "jsonb"
+      },
+      "difficulty": {
+        "format": "text",
+        "type": "string"
+      },
+      "topics": {
+        "format": "jsonb"
+      },
+      "examples": {
+        "format": "jsonb"
+      },
+      "time_limit_seconds": {
+        "format": "integer",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "interview_responses": {
+    "required": [
+      "id",
+      "round_number",
+      "user_answer"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "interview_id": {
+        "description": "Note:\nThis is a Foreign Key to `interviews.id`.<fk table='interviews' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "question_id": {
+        "description": "Note:\nThis is a Foreign Key to `interview_questions.id`.<fk table='interview_questions' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "round_number": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "user_answer": {
+        "format": "text",
+        "type": "string"
+      },
+      "code_output": {
+        "format": "text",
+        "type": "string"
+      },
+      "is_correct": {
+        "format": "boolean",
+        "type": "boolean"
+      },
+      "score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "ai_feedback": {
+        "format": "text",
+        "type": "string"
+      },
+      "improvements": {
+        "format": "text[]",
+        "items": {
+          "type": "string"
+        },
+        "type": "array"
+      },
+      "next_difficulty": {
+        "format": "text",
+        "type": "string"
+      },
+      "time_taken_seconds": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "evaluated_at": {
+        "default": "now()",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "resumes": {
+    "required": [
+      "id",
+      "user_id"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "user_id": {
+        "format": "text",
+        "type": "string"
+      },
+      "file_url": {
+        "format": "text",
+        "type": "string"
+      },
+      "extracted_text": {
+        "format": "text",
+        "type": "string"
+      },
+      "detected_skills": {
+        "format": "jsonb"
+      },
+      "experience_level": {
+        "format": "character varying",
+        "maxLength": 50,
+        "type": "string"
+      },
+      "ai_summary": {
+        "format": "text",
+        "type": "string"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      },
+      "raw_text": {
+        "format": "text",
+        "type": "string"
+      },
+      "summary": {
+        "format": "text",
+        "type": "string"
+      },
+      "skills": {
+        "format": "jsonb"
+      },
+      "experience_years": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "primary_role": {
+        "format": "text",
+        "type": "string"
+      },
+      "education": {
+        "format": "text",
+        "type": "string"
+      },
+      "key_projects": {
+        "format": "jsonb"
+      }
+    },
+    "type": "object"
+  },
+  "user_answers": {
+    "required": [
+      "id",
+      "user_id",
+      "problem_id",
+      "interview_id"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "user_id": {
+        "format": "text",
+        "type": "string"
+      },
+      "problem_id": {
+        "description": "Note:\nThis is a Foreign Key to `coding_problems.id`.<fk table='coding_problems' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "interview_id": {
+        "description": "Note:\nThis is a Foreign Key to `interview_sessions.id`.<fk table='interview_sessions' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "submitted_code": {
+        "format": "text",
+        "type": "string"
+      },
+      "correctness_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "optimization_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "code_quality_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "edge_case_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "technical_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "communication_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "confidence_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "ai_feedback": {
+        "format": "text",
+        "type": "string"
+      },
+      "pass_fail": {
+        "format": "boolean",
+        "type": "boolean"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "chatbot_messages": {
+    "required": [
+      "id",
+      "user_id",
+      "message",
+      "role"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "user_id": {
+        "format": "text",
+        "type": "string"
+      },
+      "message": {
+        "format": "text",
+        "type": "string"
+      },
+      "role": {
+        "enum": [
+          "user",
+          "assistant"
+        ],
+        "format": "public.chat_role",
+        "type": "string"
+      },
+      "context": {
+        "enum": [
+          "resume",
+          "interview",
+          "general",
+          "coding"
+        ],
+        "format": "public.context_type",
+        "type": "string"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "interviews": {
+    "required": [
+      "id",
+      "user_id",
+      "type",
+      "target_role",
+      "difficulty",
+      "status",
+      "total_rounds",
+      "current_round"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "user_id": {
+        "format": "text",
+        "type": "string"
+      },
+      "resume_id": {
+        "description": "Note:\nThis is a Foreign Key to `resumes.id`.<fk table='resumes' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "type": {
+        "format": "text",
+        "type": "string"
+      },
+      "target_role": {
+        "format": "text",
+        "type": "string"
+      },
+      "difficulty": {
+        "format": "text",
+        "type": "string"
+      },
+      "status": {
+        "default": "active",
+        "format": "text",
+        "type": "string"
+      },
+      "total_rounds": {
+        "default": 5,
+        "format": "integer",
+        "type": "integer"
+      },
+      "current_round": {
+        "default": 1,
+        "format": "integer",
+        "type": "integer"
+      },
+      "total_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "resume_context": {
+        "format": "jsonb"
+      },
+      "created_at": {
+        "default": "now()",
+        "format": "timestamp with time zone",
+        "type": "string"
+      },
+      "completed_at": {
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "users": {
+    "required": [
+      "id",
+      "name",
+      "email",
+      "password_hash",
+      "role"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "text",
+        "type": "string"
+      },
+      "name": {
+        "format": "character varying",
+        "maxLength": 150,
+        "type": "string"
+      },
+      "email": {
+        "format": "character varying",
+        "maxLength": 255,
+        "type": "string"
+      },
+      "password_hash": {
+        "format": "text",
+        "type": "string"
+      },
+      "role": {
+        "format": "character varying",
+        "maxLength": 100,
+        "type": "string"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "interview_sessions": {
+    "required": [
+      "id",
+      "user_id"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "user_id": {
+        "format": "text",
+        "type": "string"
+      },
+      "role": {
+        "format": "character varying",
+        "maxLength": 100,
+        "type": "string"
+      },
+      "difficulty_level": {
+        "format": "character varying",
+        "maxLength": 50,
+        "type": "string"
+      },
+      "round_type": {
+        "format": "character varying",
+        "maxLength": 100,
+        "type": "string"
+      },
+      "status": {
+        "default": "ongoing",
+        "enum": [
+          "ongoing",
+          "completed"
+        ],
+        "format": "public.interview_status",
+        "type": "string"
+      },
+      "start_time": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      },
+      "end_time": {
+        "format": "timestamp with time zone",
+        "type": "string"
+      },
+      "final_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "difficulty": {
+        "format": "text",
+        "type": "string"
+      },
+      "resume_context": {
+        "format": "text",
+        "type": "string"
+      },
+      "total_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "ai_feedback_summary": {
+        "format": "text",
+        "type": "string"
+      },
+      "weak_topics": {
+        "format": "jsonb"
+      },
+      "total_rounds": {
+        "default": 5,
+        "format": "integer",
+        "type": "integer"
+      },
+      "current_round": {
+        "default": 1,
+        "format": "integer",
+        "type": "integer"
+      }
+    },
+    "type": "object"
+  },
+  "adaptive_tracking": {
+    "required": [
+      "id",
+      "interview_id"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "interview_id": {
+        "description": "Note:\nThis is a Foreign Key to `interview_sessions.id`.<fk table='interview_sessions' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "difficulty_progression": {
+        "format": "jsonb"
+      },
+      "topic_reinforcement": {
+        "format": "jsonb"
+      },
+      "weak_topics": {
+        "format": "jsonb"
+      },
+      "created_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "user_analytics": {
+    "required": [
+      "user_id"
+    ],
+    "properties": {
+      "user_id": {
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "text",
+        "type": "string"
+      },
+      "total_interviews": {
+        "default": 0,
+        "format": "integer",
+        "type": "integer"
+      },
+      "average_score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "coding_average": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "strongest_topics": {
+        "format": "jsonb"
+      },
+      "weakest_topics": {
+        "format": "jsonb"
+      },
+      "readiness_percentage": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "time_complexity_trend": {
+        "format": "jsonb"
+      },
+      "success_rate_over_time": {
+        "format": "jsonb"
+      },
+      "updated_at": {
+        "default": "CURRENT_TIMESTAMP",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  },
+  "interview_round_summaries": {
+    "required": [
+      "id",
+      "round_number",
+      "round_type"
+    ],
+    "properties": {
+      "id": {
+        "default": "gen_random_uuid()",
+        "description": "Note:\nThis is a Primary Key.<pk/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "interview_id": {
+        "description": "Note:\nThis is a Foreign Key to `interviews.id`.<fk table='interviews' column='id'/>",
+        "format": "uuid",
+        "type": "string"
+      },
+      "round_number": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "round_type": {
+        "format": "text",
+        "type": "string"
+      },
+      "score": {
+        "format": "numeric",
+        "type": "number"
+      },
+      "correct_count": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "total_count": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "time_taken_seconds": {
+        "format": "integer",
+        "type": "integer"
+      },
+      "ai_summary": {
+        "format": "text",
+        "type": "string"
+      },
+      "completed_at": {
+        "default": "now()",
+        "format": "timestamp with time zone",
+        "type": "string"
+      }
+    },
+    "type": "object"
+  }
+}

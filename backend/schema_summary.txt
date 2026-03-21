@@ -1,0 +1,12 @@
+interviews -> id, user_id, resume_id, type, target_role, difficulty, status, total_rounds, current_round, total_score, resume_context, created_at, completed_at
+interview_sessions -> id, user_id, role, difficulty_level, round_type, status, start_time, end_time, final_score, difficulty, resume_context, total_score, ai_feedback_summary, weak_topics, total_rounds, current_round
+interview_questions -> id, interview_id, round_number, question_text, question_type, subject, topic, difficulty, options, correct_answer, explanation, created_at
+interview_responses -> id, interview_id, question_id, round_number, user_answer, code_output, is_correct, score, ai_feedback, improvements, next_difficulty, time_taken_seconds, evaluated_at
+interview_round_scores NOT FOUND
+code_submissions -> id, user_id, problem_id, code, language, status, score, feedback, runtime_estimate, test_cases_passed, test_cases_total, improvements, optimized_approach, created_at
+execution_logs -> id, answer_id, execution_time_ms, memory_usage_kb, status, stdout, stderr, created_at
+adaptive_tracking -> id, interview_id, difficulty_progression, topic_reinforcement, weak_topics, created_at
+coding_problems -> id, interview_id, problem_statement, input_format, output_format, constraints, visible_test_cases, hidden_test_cases, expected_time_complexity, expected_space_complexity, difficulty_level, topic_tags, created_at, user_id, title, description, starter_code, difficulty, topics, examples, time_limit_seconds
+user_analytics -> user_id, total_interviews, average_score, coding_average, strongest_topics, weakest_topics, readiness_percentage, time_complexity_trend, success_rate_over_time, updated_at
+user_answers -> id, user_id, problem_id, interview_id, submitted_code, correctness_score, optimization_score, code_quality_score, edge_case_score, technical_score, communication_score, confidence_score, ai_feedback, pass_fail, created_at
+questions -> id, interview_id, content, type, hint, expected_topics, time_limit_seconds, question_number, answer, score, feedback, improvements, created_at, subject, topic, difficulty, options, correct_answer, explanation, is_correct, time_taken_seconds

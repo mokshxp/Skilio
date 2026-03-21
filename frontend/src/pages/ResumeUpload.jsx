@@ -50,12 +50,13 @@ export default function ResumeUpload() {
 
     const handleDelete = async (id, e) => {
         e.stopPropagation()
-        if (!window.confirm('Delete this resume?')) return
+        if (!window.confirm('Are you sure you want to permanently delete this resume?')) return
         try {
             await resumeApi.delete(id)
-            fetchResumes()
+            await fetchResumes()
         } catch (err) {
-            console.error(err)
+            console.error('Delete failed:', err)
+            window.alert(`Focus! Failed to delete resume: ${err.message || 'Unknown error'}`)
         }
     }
 

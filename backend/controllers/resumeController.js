@@ -109,16 +109,39 @@ exports.deleteResume = async (req, res) => {
         const { userId } = typeof req.auth === 'function' ? req.auth() : req.auth;
         const { id } = req.params;
 
+        console.log(`[ResumeDelete] Attempting to delete resume ${id} for user ${userId}`);
+
+        // 1. Nullify references in BOTH possible interview tables
+        const tablesToClear = ["interviews", "interview_sessions"];
+        for (const table of tablesToClear) {
+            const { error: updateError } = await supabase
+                .from(table)
+                .update({ resume_id: null })
+                .eq("resume_id", id)
+                .eq("user_id", userId);
+
+            if (updateError) {
+                console.warn(`[ResumeDelete] Warning nullifying ${table}:`, updateError.message);
+            }
+        }
+
+        // 2. Delete the actual record
         const { error } = await supabase
             .from("resumes")
             .delete()
             .eq("id", id)
             .eq("user_id", userId);
 
-        if (error) return res.status(500).json({ message: error.message });
+        if (error) {
+            console.error("[ResumeDelete] Error deleting resume:", error);
+            return res.status(500).json({ message: `Database error: ${error.message}` });
+        }
+
+        console.log(`[ResumeDelete] Successfully deleted resume ${id}`);
         res.json({ message: "Resume deleted successfully" });
     } catch (err) {
-        res.status(500).json({ message: err.message });
+        console.error("[ResumeDelete] Exception:", err);
+        res.status(500).json({ message: `Internal server error: ${err.message}` });
     }
 };
 

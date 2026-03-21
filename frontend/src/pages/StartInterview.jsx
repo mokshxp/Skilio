@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { FileText, ChevronDown, ChevronUp, Upload, Loader2, Play } from 'lucide-react'
+import { FileText, ChevronDown, ChevronUp, Upload, Loader2, Play, Lock, Zap } from 'lucide-react'
 import { interviewApi, resumeApi } from '../services/api.js'
+import { useSubscription } from '../hooks/useSubscription.js'
 
 const ROLES = ['Frontend Engineer', 'Backend Engineer', 'Full Stack', 'Data Scientist', 'ML Engineer', 'DevOps', 'System Design', 'Product Manager']
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced', 'Expert']
@@ -25,6 +26,7 @@ const fadeUp = {
 export default function StartInterview() {
     const navigate = useNavigate()
     const location = useLocation()
+    const { canStartInterview, isFree, usage, isLoading: subLoading } = useSubscription()
     const [role, setRole] = useState('Frontend Engineer')
     const [difficulty, setDifficulty] = useState('Intermediate')
     const [round, setRound] = useState('technical')
@@ -98,18 +100,41 @@ export default function StartInterview() {
     const selectedRound = ROUNDS.find(r => r.id === round)
 
     const handleStart = async () => {
+        if (!role) {
+            setError('Please select a target role')
+            return
+        }
+        if (!difficulty) {
+            setError('Please select a difficulty')
+            return
+        }
+        if (!round) {
+            setError('Please select a round type')
+            return
+        }
+
         setLoading(true)
         setError(null)
+        
         try {
-            const res = await interviewApi.create({
-                role,
-                difficulty,
-                round_type: round,
-                resume_id: resumeId || (selectedResume?.id)
-            })
+            const payload = {
+                role: role.trim(),
+                difficulty: difficulty.toLowerCase().trim(),
+                roundType: round.toLowerCase().trim(),
+                resumeId: (selectedResume?.id) || null,
+                totalRounds: 5,
+            }
+            
+            console.log('[Frontend] Starting interview with payload:', payload)
+            
+            const res = await interviewApi.create(payload)
             navigate(`/interview/${res.interviewId}`)
         } catch (e) {
-            setError(e.message || 'Failed to start. Please try again.')
+            console.error('[Frontend] Start failed:', e)
+            if (e.response?.data) {
+                console.error('[Frontend] Error Body:', e.response.data)
+            }
+            setError(e.response?.data?.message || e.message || 'Failed to start. Please try again.')
             setLoading(false)
         }
     }

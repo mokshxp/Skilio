@@ -17,6 +17,7 @@ const interviewRoutes = require("./routes/interviewRoutes");
 const codingRoutes = require("./routes/codingRoutes");
 const analyticsRoutes = require("./routes/analyticsRoutes");
 const chatRoutes = require("./routes/chatRoutes");
+const sheetRoutes = require("./routes/sheetRoutes");
 
 const app = express();
 
@@ -36,6 +37,12 @@ app.use((req, res, next) => {
 app.use(morgan("combined", {
     stream: { write: (message) => logger.info(message.trim()) }
 }));
+// TRACE: Global debug tracer
+app.use((req, res, next) => {
+    console.log(`[DEBUG_TRACE] ${req.method} ${req.originalUrl}`);
+    apiLogger.info(`[DEBUG_TRACE] ${req.method} ${req.originalUrl}`);
+    next();
+});
 
 // ── Security Headers ─────────────────────────────────────────
 app.use(helmet({
@@ -123,9 +130,12 @@ const scrapingLimiter = rateLimit({
     handler: rateLimitHandler
 });
 app.use("/analytics", scrapingLimiter);
+app.use("/sheets", scrapingLimiter);
 
 // ── Auth ─────────────────────────────────────────────────────
 app.use(clerkMiddleware());
+
+const subscriptionRoutes = require("./routes/subscriptionRoutes");
 
 // ── Routes ───────────────────────────────────────────────────
 app.use("/resume", resumeRoutes);
@@ -133,6 +143,8 @@ app.use("/interview", interviewRoutes);
 app.use("/coding", codingRoutes);
 app.use("/analytics", analyticsRoutes);
 app.use("/chat", chatRoutes);
+app.use("/subscription", subscriptionRoutes);
+app.use("/sheets", sheetRoutes);
 
 // Health check
 app.get("/health", (req, res) => res.json({ status: "ok" }));
@@ -143,25 +155,27 @@ app.use((req, res) => {
     res.status(404).json({ error: "Endpoint not found" });
 });
 
-// Global error handler
+// Global error handler — Enhanced
 app.use((err, req, res, next) => {
     if (err.name === 'MulterError' && err.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({ error: "File too large. Maximum size is 10MB." });
     }
 
-    if (err.message === 'Unauthenticated' || err.statusCode === 401) {
-        securityLogger.info(`AUTH_FAIL: Unauthorized access attempt to ${req.originalUrl}`);
-        return res.status(401).json({ error: "Unauthorized" });
-    }
-
+    const status = err.status || err.statusCode || 500;
+    
     logger.error(`UNHANDLED_ERROR: ${err.message}`, { 
         stack: err.stack, 
         path: req.originalUrl,
-        ip: req.ip 
+        ip: req.ip,
+        status: status
     });
 
-    res.status(err.status || 500).json({
-        error: process.env.NODE_ENV === 'production' ? "Internal server error" : err.message
+    res.status(status).json({
+        error: "Server Error",
+        message: err.message, // Returning the message during debugging
+        code: err.code || err.name,
+        details: err.details || err.detail,
+        hint: err.hint
     });
 });
 

@@ -1,13 +1,17 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { motion } from 'framer-motion'
+import { useSubscription } from '../../hooks/useSubscription.js'
+import PlanBadge from '../subscription/PlanBadge.jsx'
 
 const NAV = [
     { path: '/dashboard', label: 'Dashboard', icon: DashIcon },
     { path: '/resume', label: 'Resume', icon: ResumeIcon },
     { path: '/start', label: 'Interview', icon: InterviewIcon },
     { path: '/analytics', label: 'Analytics', icon: AnalyticsIcon },
+    { path: '/sheets', label: 'Topic Sheets', icon: SheetsIcon },
     { path: '/copilot', label: 'AI Copilot', icon: CopilotIcon },
+    { path: '/pricing', label: 'Pricing', icon: PricingIcon },
 ]
 
 function navLinkClass({ isActive }) {
@@ -20,6 +24,7 @@ function navLinkClass({ isActive }) {
 export default function Sidebar() {
     const { signOut, user } = useAuth()
     const navigate = useNavigate()
+    const { plan, isFree } = useSubscription()
 
     return (
         <motion.aside
@@ -88,8 +93,19 @@ export default function Sidebar() {
                 ))}
             </nav>
 
-            {/* User */}
+            {/* User + Plan */}
             <div className="px-3 py-4 border-t" style={{ borderColor: 'var(--border)' }}>
+                {/* Plan badge + billing link */}
+                <button
+                    onClick={() => navigate('/settings/billing')}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl mb-2"
+                    style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}
+                    title="Manage billing"
+                >
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-2)', fontWeight: 600 }}>Your Plan</span>
+                    <PlanBadge plan={plan} />
+                </button>
+
                 <div
                     className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
                     style={{ background: 'var(--bg-2)', border: '1px solid var(--border)' }}
@@ -120,13 +136,31 @@ export default function Sidebar() {
                     </button>
                 </div>
 
-                <button
-                    onClick={() => navigate('/start')}
-                    className="btn-amber w-full mt-3 justify-center"
-                >
-                    <PlusIcon size={14} />
-                    New Interview
-                </button>
+                {isFree ? (
+                    <button
+                        onClick={() => navigate('/pricing')}
+                        className="w-full mt-3 justify-center"
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: 6,
+                            padding: '0.5rem 1rem', borderRadius: 10,
+                            background: 'var(--accent-dim)',
+                            border: '1px solid rgba(255,183,3,0.25)',
+                            color: 'var(--accent)',
+                            fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer',
+                        }}
+                    >
+                        <ZapIcon size={13} />
+                        Upgrade to Pro
+                    </button>
+                ) : (
+                    <button
+                        onClick={() => navigate('/start')}
+                        className="btn-amber w-full mt-3 justify-center"
+                    >
+                        <PlusIcon size={14} />
+                        New Interview
+                    </button>
+                )}
             </div>
         </motion.aside>
     )
@@ -187,3 +221,29 @@ function PlusIcon({ size = 16 }) {
         </svg>
     )
 }
+function PricingIcon({ size = 16 }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
+            <path d="M12 6v2M12 16v2M8 12h8" />
+            <path d="M9.5 9.5C9.5 8.12 10.62 7 12 7s2.5 1.12 2.5 2.5c0 1.5-2.5 2.5-2.5 2.5s-2.5 1-2.5 2.5C9.5 15.88 10.62 17 12 17s2.5-1.12 2.5-2.5" />
+        </svg>
+    )
+}
+function ZapIcon({ size = 16 }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="13,2 3,14 12,14 11,22 21,10 12,10 13,2" />
+        </svg>
+    )
+}
+
+function SheetsIcon({ size = 16 }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        </svg>
+    )
+}
+
