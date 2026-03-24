@@ -113,6 +113,11 @@ export default function StartInterview() {
             return
         }
 
+        if (!canStartInterview) {
+            setError('You have reached your interview limit for this billing cycle. Please upgrade your plan.')
+            return
+        }
+
         setLoading(true)
         setError(null)
         
@@ -499,24 +504,39 @@ export default function StartInterview() {
                                 </motion.p>
                             )}
 
+                            {!canStartInterview && !error && !subLoading && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    style={{ padding: '10px 14px', background: 'rgba(251, 113, 133, 0.1)', border: '1px solid rgba(251, 113, 133, 0.3)', borderRadius: 8, marginBottom: 12, display: 'flex', gap: 8, alignItems: 'center' }}
+                                >
+                                    <Lock size={14} style={{ color: 'var(--rose)', flexShrink: 0 }} />
+                                    <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 12, color: 'var(--rose)', margin: 0, lineHeight: 1.4 }}>
+                                        Interview limit reached. <span onClick={() => navigate('/pricing')} style={{ fontWeight: 700, cursor: 'pointer', textDecoration: 'underline' }}>Upgrade to Pro</span>
+                                    </p>
+                                </motion.div>
+                            )}
+
                             <motion.button
                                 onClick={handleStart}
-                                disabled={loading}
-                                whileHover={loading ? {} : { scale: 1.02, boxShadow: '0 0 20px var(--accent-glow)' }}
-                                whileTap={loading ? {} : { scale: 0.97 }}
+                                disabled={loading || subLoading || (!canStartInterview && isFree)}
+                                whileHover={(loading || (!canStartInterview && isFree)) ? {} : { scale: 1.02, boxShadow: '0 0 20px var(--accent-glow)' }}
+                                whileTap={(loading || (!canStartInterview && isFree)) ? {} : { scale: 0.97 }}
                                 style={{
                                     width: '100%', padding: '12px 0',
-                                    background: loading ? 'var(--bg-3)' : 'var(--amber)',
-                                    color: loading ? 'var(--text-2)' : 'var(--bg-0)',
-                                    border: 'none', borderRadius: 8, cursor: loading ? 'default' : 'pointer',
+                                    background: (loading || (!canStartInterview && isFree)) ? 'var(--bg-3)' : 'var(--amber)',
+                                    color: (loading || (!canStartInterview && isFree)) ? 'var(--text-2)' : 'var(--bg-0)',
+                                    border: 'none', borderRadius: 8, cursor: (loading || (!canStartInterview && isFree)) ? 'not-allowed' : 'pointer',
                                     fontFamily: 'Manrope, sans-serif', fontSize: 14, fontWeight: 600,
                                     transition: 'background 0.2s, color 0.2s',
                                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                                     position: 'relative', overflow: 'hidden',
                                 }}
                             >
-                                {loading ? (
-                                    <><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ display: 'flex' }}><Loader2 size={16} /></motion.div> Starting…</>
+                                {loading || subLoading ? (
+                                    <><motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }} style={{ display: 'flex' }}><Loader2 size={16} /></motion.div> {subLoading ? 'Verifying...' : 'Starting…'}</>
+                                ) : !canStartInterview && isFree ? (
+                                    <><Lock size={16} /> Upgrade to Start</>
                                 ) : (
                                     'Start Interview'
                                 )}

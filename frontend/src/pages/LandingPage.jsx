@@ -547,7 +547,7 @@ export default function LandingPage({ devMode }) {
                             </SafeSignInButton>
                         </SafeSignedOut>
                         <SafeSignedIn>
-                            <motion.button className="btn-amber btn-lg" onClick={() => navigate('/dashboard')} whileHover={{ scale: 1.06, boxShadow: '0 0 32px var(--amber-glow)' }} whileTap={{ scale: 0.97 }}>
+                            <motion.button className="btn-amber btn-lg" onClick={() => navigate('/start')} whileHover={{ scale: 1.06, boxShadow: '0 0 32px var(--amber-glow)' }} whileTap={{ scale: 0.97 }}>
                                 🚀 Launch AI Interview →
                             </motion.button>
                         </SafeSignedIn>

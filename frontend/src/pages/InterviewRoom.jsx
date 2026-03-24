@@ -45,7 +45,7 @@ const InterviewRoom = () => {
           session: data,
           round: {
             roundNumber: currentRoundNum,
-            roundType: currentRoundQs[0]?.round_type || 'mcq',
+            roundType: currentRoundQs[0]?.question_type || 'mcq',
             questions: currentRoundQs
           }
         });
@@ -64,24 +64,25 @@ const InterviewRoom = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0A0A0B] gap-4">
-        <Loader2 className="w-12 h-12 text-cyan-500 animate-spin" />
-        <p className="text-neutral-500 font-medium animate-pulse uppercase tracking-widest text-xs">Initializing Secure Session...</p>
+      <div className="h-screen w-full flex flex-col items-center justify-center gap-4" style={{ background: 'var(--bg-0)' }}>
+        <Loader2 className="w-12 h-12 animate-spin" style={{ color: 'var(--accent)' }} />
+        <p className="font-medium animate-pulse uppercase tracking-widest text-xs" style={{ color: 'var(--text-2)' }}>Initializing Secure Session...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0A0A0B] p-6 text-center">
+      <div className="h-screen w-full flex flex-col items-center justify-center p-6 text-center" style={{ background: 'var(--bg-0)' }}>
         <div className="w-20 h-20 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mb-6">
           <AlertCircle className="w-10 h-10 text-red-500" />
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-        <p className="text-neutral-500 mb-8 max-w-md">{error}</p>
+        <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-0)' }}>Access Denied</h2>
+        <p className="mb-8 max-w-md" style={{ color: 'var(--text-2)' }}>{error}</p>
         <button 
           onClick={() => navigate('/dashboard')}
-          className="flex items-center gap-2 px-6 py-3 bg-neutral-900 text-white rounded-xl hover:bg-neutral-800 transition-all font-bold"
+          className="flex items-center gap-2 px-6 py-3 rounded-xl hover:opacity-80 transition-all font-bold"
+          style={{ background: 'var(--bg-1)', color: 'var(--text-0)' }}
         >
           <Home className="w-4 h-4" /> Return to Dashboard
         </button>
@@ -108,19 +109,19 @@ const InterviewRoom = () => {
       default:
         return (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
-             <RefreshCcw className="w-12 h-12 text-neutral-800 animate-spin-slow" />
-             <p className="text-neutral-600 font-bold uppercase tracking-widest text-xs tracking-widest">Awaiting Round Data...</p>
+             <RefreshCcw className="w-12 h-12 animate-spin-slow" style={{ color: 'var(--text-2)' }} />
+             <p className="font-bold uppercase tracking-widest text-xs tracking-widest" style={{ color: 'var(--text-2)' }}>Awaiting Round Data...</p>
           </div>
         );
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--bg-0)' }}>
        {/* Global Background Elements */}
        <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-cyan-500/5 blur-[120px] rounded-full" />
-          <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] bg-purple-500/5 blur-[120px] rounded-full" />
+          <div className="absolute top-0 left-1/4 w-[500px] h-[500px] blur-[120px] rounded-full opacity-5" style={{ background: 'var(--accent)' }} />
+          <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] blur-[120px] rounded-full opacity-5" style={{ background: 'var(--accent)' }} />
        </div>
 
        <main className="flex-1 relative z-10">

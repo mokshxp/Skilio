@@ -31,49 +31,57 @@ function validateInputLength(input, label, maxLength = MAX_INPUT_LENGTH) {
    Utility: Safe JSON extraction from text
 ─────────────────────────────────────────────── */
 function extractJSON(text) {
-  let cleaned = text
-    .replace(/```json\n?/gi, '')
-    .replace(/```\n?/gi, '')
-    .trim();
+  if (!text) throw new Error('AI returned empty response');
 
-  let parsed;
-
+  // 1. Try direct parse first (cleanest case)
+  let cleaned = text.trim();
   try {
-    parsed = JSON.parse(cleaned);
-  } catch (parseError) {
-    // Try to extract JSON from the text
-    const arrayMatch = cleaned.match(/\[[\s\S]*\]/);
-    const objectMatch = cleaned.match(/\{[\s\S]*\}/);
+    return normalizeResult(JSON.parse(cleaned));
+  } catch (e) {}
 
-    if (arrayMatch) {
-      try { parsed = JSON.parse(arrayMatch[0]); } catch(e) {}
-    } else if (objectMatch) {
-      try { parsed = JSON.parse(objectMatch[0]); } catch(e) {}
-    }
-    
-    if (!parsed) {
-      console.error('[AI Parse Error] Could not extract JSON from:', cleaned.substring(0, 200));
-      throw new Error('AI returned unparseable response');
-    }
+  // 2. Remove markdown code blocks and try again
+  cleaned = text
+    .replace(/```json\s?/gi, '')
+    .replace(/```\s?/gi, '')
+    .trim();
+  try {
+    return normalizeResult(JSON.parse(cleaned));
+  } catch (e) {}
+
+  // 3. Regex-based extraction (handle conversational preamble/postamble)
+  const arrayMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
+  const objectMatch = text.match(/\{\s*\"[\s\S]*\}\s*/);
+
+  if (arrayMatch) {
+    try { return normalizeResult(JSON.parse(arrayMatch[0])); } catch(e) {}
+  }
+  
+  if (objectMatch) {
+    try {
+      // Find the last closing brace to avoid greediness issues with multiple objects
+      const lastBrace = text.lastIndexOf('}');
+      const firstBrace = text.indexOf('{');
+      if (firstBrace !== -1 && lastBrace !== -1) {
+        const potentialJson = text.substring(firstBrace, lastBrace + 1);
+        return normalizeResult(JSON.parse(potentialJson));
+      }
+    } catch(e) {}
   }
 
+  console.error('[AI Parse Error] Completely unparseable response:', text.substring(0, 500));
+  throw new Error('AI returned unparseable response');
+}
+
+function normalizeResult(parsed) {
+  if (!parsed) return [];
   // Normalize to array — handle all cases AI might return
-  if (Array.isArray(parsed)) {
-    return parsed;
-  }
-
+  if (Array.isArray(parsed)) return parsed;
   if (parsed && typeof parsed === 'object') {
-    // Case: { questions: [...] }
     if (Array.isArray(parsed.questions)) return parsed.questions;
-    // Case: { "1": {...}, "2": {...} }
-    if (Object.keys(parsed).every(k => !isNaN(Number(k)))) {
-      return Object.values(parsed);
-    }
-    // Case: single object
+    if (Object.keys(parsed).every(k => !isNaN(Number(k)))) return Object.values(parsed);
     return [parsed];
   }
-
-  throw new Error(`Unexpected AI response shape: ${typeof parsed}`);
+  return [parsed];
 }
 
 /* ───────────────────────────────────────────────
@@ -696,7 +704,12 @@ Rules:
 2. Ensure test cases are valid and match the problem.
 3. The problem should be original or a creative variation of standard ones.`;
 
-  return callNvidia({ systemInstruction, userContent: `Generate a ${difficulty} DSA problem.`, temperature: 0.9 });
+  const userContent = `Generate a high-quality ${difficulty} DSA coding problem for a ${targetRole} candidate with ${experienceYears} years of experience.
+  Focus on topics like ${difficulty === 'easy' ? 'Arrays, Strings, HashMaps' : (difficulty === 'medium' ? 'Trees, Graphs, Sliding Window' : 'DP, Advanced Graphs, Hard Array Manipulations')}.
+  
+  Ensure the response is ONLY the JSON object following the system instructions.`;
+
+  return callNvidia({ systemInstruction, userContent, temperature: 0.7 });
 }
 
 /* ───────────────────────────────────────────────

@@ -29,7 +29,11 @@ exports.uploadResume = async (req, res) => {
 
         // Parse resume using AI
         console.log("Sending to NVIDIA Qwen for analysis...");
-        const parsed = await analyzeResume(extractedText);
+        let parsed = await analyzeResume(extractedText);
+        
+        // AI service returns an array [obj], so we normalize it
+        if (Array.isArray(parsed)) parsed = parsed[0];
+        
         console.log("✅ AI analysis complete:", JSON.stringify(parsed).substring(0, 300));
 
         const { data: insertedResume, error } = await supabase
@@ -96,8 +100,13 @@ exports.getResume = async (req, res) => {
             query = query.order("created_at", { ascending: false }).limit(1);
         }
 
-        const { data, error } = await query.single();
-        if (error || !data) return res.status(404).json({ message: "No resume found" });
+        const { data, error } = await query.maybeSingle();
+
+        if (error) return res.status(500).json({ message: error.message });
+        if (!data) {
+            if (req.params.id === 'latest') return res.json(null);
+            return res.status(404).json({ message: "No resume found" });
+        }
         res.json(data);
     } catch (err) {
         res.status(500).json({ message: err.message });
@@ -174,9 +183,13 @@ exports.getStructuredResume = async (req, res) => {
             query = query.order("created_at", { ascending: false }).limit(1);
         }
 
-        const { data, error } = await query.single();
+        const { data, error } = await query.maybeSingle();
 
-        if (error || !data) return res.status(404).json({ message: "No resume found" });
+        if (error) return res.status(500).json({ message: error.message });
+        if (!data) {
+            if (req.params.id === 'latest') return res.json(null);
+            return res.status(404).json({ message: "No resume found" });
+        }
         res.json(data);
     } catch (err) {
         res.status(500).json({ message: err.message });

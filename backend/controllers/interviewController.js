@@ -1,6 +1,6 @@
 const {
   generateMCQBatch,
-  generateDSAProlbemBatch,
+  generateDSAProblemBatch,
   generateHRBatch,
   evaluateHRAnswer,
   evaluateCode
@@ -262,7 +262,11 @@ exports.startInterview = async (req, res) => {
 // ──────────────────────────────────────────────────
 exports.completeRound = async (req, res) => {
   try {
-    const { interviewId, roundNumber, responses } = req.body;
+    const interviewId = req.body.interviewId?.toString().replace('sess_', '');
+    const { responses } = req.body;
+    const roundNumber = parseInt(req.body.roundNumber);
+    
+    console.log(`[CompleteRound] Round ${roundNumber} finished. Progressing to ${roundNumber + 1}`);
     const { userId } = typeof req.auth === 'function' ? req.auth() : req.auth;
 
     // 1. Verify access
@@ -275,26 +279,77 @@ exports.completeRound = async (req, res) => {
 
     if (!interview) return res.status(404).json({ message: "Interview not found" });
 
-    // 2. Save responses
-    const responsesToInsert = (responses || []).map(r => ({
-      interview_id: interviewId,
-      question_id: r.questionId,
-      round_number: roundNumber,
-      selected_option: r.selectedOption || r.answer, // handle different field names
-      user_answer: r.answer || r.selectedOption,
-      time_taken_seconds: r.timeTaken,
-      is_correct: r.isCorrect,
-      score: r.isCorrect ? 1 : 0
-    }));
+    const rNum = parseInt(roundNumber);
+    const { data: qData, error: qFetchError } = await supabase
+      .from("interview_questions")
+      .select("id, correct_answer, options")
+      .eq("interview_id", interviewId)
+      .eq("round_number", rNum);
 
-    await supabase.from("interview_responses").insert(responsesToInsert);
+    if (qFetchError) throw qFetchError;
 
-    // 3. Calculate score
-    const correctCount = responses.filter(r => r.isCorrect).length;
-    const totalCount = responses.length;
-    const score = totalCount > 0 ? (correctCount / totalCount) * 10 : 0;
+    const questionMap = (qData || []).reduce((acc, q) => {
+      acc[q.id] = { correct: q.correct_answer, options: q.options };
+      return acc;
+    }, {});
 
-    // 4. Create Round Summary
+    // 3. Save responses and calculate correct count
+    let correctCount = 0;
+    const responsesToInsert = (responses || []).map(r => {
+      const qInfo = questionMap[r.questionId];
+      if (!qInfo) return null; // Should not happen
+
+      const dbCorrectValue = String(qInfo.correct || '').trim();
+      const userSelected = String(r.selectedOption || r.answer || '').trim();
+      
+      // Verification logic:
+      // Case 1: Direct match (e.g. "A" === "A" or "Paris" === "Paris")
+      let isCorrect = (dbCorrectValue.toUpperCase() === userSelected.toUpperCase());
+
+      // Case 2: User sent key (A), but DB has value ("Paris")
+      if (!isCorrect && qInfo.options) {
+          const valFromOption = String(qInfo.options[userSelected] || '').trim();
+          if (valFromOption && valFromOption.toUpperCase() === dbCorrectValue.toUpperCase()) {
+              isCorrect = true;
+          }
+      }
+
+      // Case 3: User sent value ("Paris"), but DB has key (A)
+      if (!isCorrect && qInfo.options) {
+          // Find key for the value
+          const keyForValue = Object.keys(qInfo.options).find(k => 
+              String(qInfo.options[k] || '').trim().toUpperCase() === userSelected.toUpperCase()
+          );
+          if (keyForValue && keyForValue.toUpperCase() === dbCorrectValue.toUpperCase()) {
+              isCorrect = true;
+          }
+      }
+      
+      if (isCorrect) correctCount++;
+      
+      console.log(`- Q: ${r.questionId} Found: ${dbCorrectValue} User: ${userSelected} Result: ${isCorrect}`);
+
+      return {
+        interview_id: interviewId,
+        question_id: r.questionId,
+        round_number: roundNumber,
+        selected_option: userSelected,
+        user_answer: r.answer || r.selectedOption,
+        time_taken_seconds: r.timeTaken || 0,
+        is_correct: isCorrect,
+        score: isCorrect ? 1 : 0
+      };
+    }).filter(Boolean);
+
+    if (responsesToInsert.length > 0) {
+      await supabase.from("interview_responses").insert(responsesToInsert);
+    }
+
+    // 4. Calculate final score
+    const totalCount = responsesToInsert.length || 1;
+    const score = (correctCount / totalCount) * 10;
+
+    // 5. Create Round Summary
     const { data: summary } = await supabase
       .from("interview_round_summaries")
       .insert({
@@ -318,23 +373,16 @@ exports.completeRound = async (req, res) => {
     // 6. Generate Next Round
     const nextRoundNumber = roundNumber + 1;
     let nextRoundQuestions = [];
+    let savedNextQs = [];
     let nextRoundType = '';
 
-    if (nextRoundNumber === 2) {
-      nextRoundType = 'mcq';
-      nextRoundQuestions = await generateMCQBatch({
-        targetRole: interview.target_role,
-        difficulty: interview.difficulty,
-        roundNumber: 2
-      });
-    } else if (nextRoundNumber === 3 || nextRoundNumber === 4) {
+    if (nextRoundNumber === 2 || nextRoundNumber === 3 || nextRoundNumber === 4) {
       nextRoundType = 'dsa';
-      const dsaProblem = await generateDSAProlbemBatch({
+      nextRoundQuestions = await generateDSAProblemBatch({
         targetRole: interview.target_role,
-        difficulty: nextRoundNumber === 3 ? 'easy' : 'medium',
+        difficulty: nextRoundNumber === 2 ? 'easy' : (nextRoundNumber === 3 ? 'medium' : 'hard'),
         roundNumber: nextRoundNumber
       });
-      nextRoundQuestions = [dsaProblem];
     } else if (nextRoundNumber === 5) {
       nextRoundType = 'hr';
       nextRoundQuestions = await generateHRBatch({
@@ -343,31 +391,89 @@ exports.completeRound = async (req, res) => {
       });
     }
 
-    // 7. Save next round questions
-    const nextQsInsert = nextRoundQuestions.map(q => ({
-      interview_id: interviewId,
-      round_number: nextRoundNumber,
-      question_type: nextRoundType,
-      question_text: q.questionText || q.problemStatement || "",
-      question_slug: q.slug || null,
-      subject: q.subject || null,
-      topic: q.topic || null,
-      difficulty: q.difficulty || interview.difficulty,
-      options: q.options || null,
-      correct_answer: q.correctAnswer || null,
-      explanation: q.explanation || null,
-      function_signature: q.functionSignatures || null,
-      examples: q.examples || null,
-      constraints: q.constraints || null,
-      test_cases: q.testCases || null,
-      hints: q.hints || null,
-      solution_approach: q.solution_approach || null
-    }));
+    // 7. Process questions into the new schema
+    for (const q of nextRoundQuestions) {
+      if (nextRoundType === 'dsa') {
+        // A. Upsert to base question bank
+        const slug = q.slug || q.question_slug || (q.title ? q.title.toLowerCase().replace(/\s+/g, '-') : 'problem');
+        const { data: baseQ, error: baseErr } = await supabase
+          .from("dsa_questions")
+          .upsert({
+            title: q.title || q.topic || "Coding Challenge",
+            slug: slug,
+            topic: q.topic || "Algorithms",
+            difficulty: nextRoundNumber === 2 ? 'easy' : (nextRoundNumber === 3 ? 'medium' : 'hard'),
+            base_description: q.problemStatement || q.questionText || q.question_text || "",
+            constraints: Array.isArray(q.constraints) ? q.constraints : [q.constraints],
+            created_at: new Date()
+          }, { onConflict: 'slug' })
+          .select()
+          .single();
 
-    const { data: savedNextQs } = await supabase
+        if (baseQ) {
+          // B. Insert into session questions with AI variation
+          await supabase.from("session_questions").insert({
+            session_id: interviewId,
+            question_id: baseQ.id,
+            ai_variation: q, // full AI JSON
+            test_cases: q.test_cases || q.testCases || null,
+            difficulty: baseQ.difficulty,
+            order_index: 1
+          });
+        }
+      }
+
+      // Also keep interview_questions for backward compatibility/unified MCQ flow
+      const nextQsInsert = [{
+        interview_id: interviewId,
+        round_number: nextRoundNumber,
+        question_type: nextRoundType,
+        question_text: q.questionText || q.problemStatement || q.question_text || "",
+        question_slug: q.slug || q.question_slug || null,
+        subject: q.subject || null,
+        topic: q.topic || q.title || q.subject || null,
+        difficulty: q.difficulty || interview.difficulty,
+        options: q.options || null,
+        correct_answer: q.correct_answer || q.correctAnswer || null,
+        explanation: q.explanation || null,
+        function_signature: q.function_signature || q.functionSignatures || q.starter_code || null,
+        examples: q.examples || null,
+        constraints: q.constraints || null,
+        test_cases: q.test_cases || q.testCases || null,
+        hints: q.hints || null,
+        solution_approach: q.solution_approach || null
+      }];
+      const { data: insData, error: insErr } = await supabase.from("interview_questions").insert(nextQsInsert).select();
+      if (insErr) {
+        console.error("❌ [V2] Failed to insert interview_question:", insErr);
+        // If we can't save the questions, we should NOT move the interview round forward
+        // However, we're already halfway through. We'll return the error later.
+      } else {
+        console.log(`✅ [V2] Inserted Round ${nextRoundNumber} questions for session ${interviewId}`);
+        // Add to our return list if select() didn't return them for some reason
+        if (savedNextQs.length === 0 && insData) savedNextQs.push(...insData);
+      }
+    }
+
+    // Double check we have them
+    if (savedNextQs.length === 0) {
+       console.log("⚠️ [V2] No questions found for next round. Re-fetching...");
+       const { data: refetch } = await supabase
+        .from("interview_questions")
+        .select("*")
+        .eq("interview_id", interviewId)
+        .eq("round_number", nextRoundNumber);
+       if (refetch) savedNextQs.push(...refetch);
+    }
+
+    // Since we kept interview_questions, we can still fetch from it for now, 
+    // but the session_questions is now being populated too.
+    const { data: fetchedNextQs } = await supabase
       .from("interview_questions")
-      .insert(nextQsInsert)
-      .select();
+      .select("*")
+      .eq("interview_id", interviewId)
+      .eq("round_number", nextRoundNumber);
+    if (fetchedNextQs) savedNextQs = fetchedNextQs; // Assign to the already declared variable
 
     // 8. Update interview current round
     await supabase.from("interviews").update({ current_round: nextRoundNumber }).eq("id", interviewId);
@@ -394,7 +500,8 @@ exports.completeRound = async (req, res) => {
 // ──────────────────────────────────────────────────
 exports.submitDSA = async (req, res) => {
   try {
-    const { interviewId, questionId, roundNumber, code, language } = req.body;
+    const interviewId = req.body.interviewId?.toString().replace('sess_', '');
+    const { questionId, roundNumber, code, language } = req.body;
     
     // 1. Fetch test cases
     const { data: question } = await supabase
@@ -414,13 +521,17 @@ exports.submitDSA = async (req, res) => {
     }));
 
     // 3. AI Evaluation
-    const aiEval = await evaluateCode({
+    let aiEval = await evaluateCode({
       problem: question.question_text,
       code,
       language
     });
+    
+    // Normalize from [obj]
+    if (Array.isArray(aiEval)) aiEval = aiEval[0];
 
-    // 4. Save response
+    // 4. Save response to both NEW and OLD tables
+    // Legacy mapping
     await supabase.from("interview_responses").insert({
       interview_id: interviewId,
       question_id: questionId,
@@ -434,15 +545,52 @@ exports.submitDSA = async (req, res) => {
       improvements: aiEval.improvements
     });
 
+    // New Schema: question_attempts
+    // First, find the base_question_id if it exists
+    const { data: sessionQ } = await supabase
+      .from("session_questions")
+      .select("question_id")
+      .eq("session_id", interviewId)
+      .limit(1)
+      .maybeSingle();
+
+    const baseQuestionId = sessionQ?.question_id;
+
+    await supabase.from("question_attempts").insert({
+      session_id: interviewId,
+      question_id: baseQuestionId || questionId, // Fallback to current ID if session_question wasn't used
+      user_code: code,
+      language: language,
+      test_results: testResults,
+      passed_cases: testResults.filter(r => r.passed).length,
+      total_cases: testResults.length,
+      time_complexity: aiEval.runtime_estimate || aiEval.timeComplexity || "O(N)",
+      space_complexity: aiEval.space_complexity || aiEval.spaceComplexity || "O(1)",
+      ai_feedback: aiEval.feedback,
+      score: Math.round(aiEval.score || 0),
+      submitted_at: new Date()
+    });
+
+    // Update user history
+    const authData = typeof req.auth === 'function' ? req.auth() : req.auth;
+    const userId = authData?.userId;
+    if (userId && baseQuestionId) {
+      await supabase.from("user_question_history").upsert({
+        user_id: userId,
+        question_id: baseQuestionId,
+        seen_at: new Date()
+      }, { onConflict: 'user_id, question_id' });
+    }
+
     res.json({
       testResults,
-      passed: testResults.length,
+      passed: testResults.filter(r => r.passed).length,
       total: testResults.length,
-      allPassed: true,
+      allPassed: testResults.every(r => r.passed),
       aiEvaluation: {
         score: aiEval.score / 10,
-        timeComplexity: aiEval.runtime_estimate,
-        spaceComplexity: aiEval.space_complexity,
+        timeComplexity: aiEval.runtime_estimate || aiEval.timeComplexity,
+        spaceComplexity: aiEval.space_complexity || aiEval.spaceComplexity,
         feedback: aiEval.feedback,
         improvements: aiEval.improvements
       }
@@ -460,7 +608,8 @@ exports.submitDSA = async (req, res) => {
 // ──────────────────────────────────────────────────
 exports.runDSA = async (req, res) => {
   try {
-    const { interviewId, questionId, code, language } = req.body;
+    const interviewId = req.body.interviewId?.toString().replace('sess_', '');
+    const { questionId, code, language } = req.body;
     
     // 1. Fetch visible test cases
     const { data: question } = await supabase
@@ -513,8 +662,112 @@ exports.getSession = async (req, res) => {
 
     if (!session) return res.status(404).json({ message: "Session not found" });
 
+    // --- SELF HEALING LOGIC ---
+    // If we're at a round that should have questions, but they're missing, generate them on the fly.
+    const currentRoundNum = session.current_round;
+    const currentRoundQs = (session.interview_questions || []).filter(q => q.round_number === currentRoundNum);
+    
+    if (session.status === 'active' && currentRoundQs.length === 0 && currentRoundNum > 1 && currentRoundNum < 6) {
+       console.log(`🛠️ [Self-Heal] Missing questions for Round ${currentRoundNum}. Generating...`);
+       
+       let nextRoundQuestions = [];
+       if (currentRoundNum >= 2 && currentRoundNum <= 4) {
+          nextRoundQuestions = await generateDSAProblemBatch({
+             targetRole: session.target_role,
+             difficulty: currentRoundNum === 2 ? 'easy' : (currentRoundNum === 3 ? 'medium' : 'hard'),
+             roundNumber: currentRoundNum
+          });
+       } else if (currentRoundNum === 5) {
+          nextRoundQuestions = await generateHRBatch({ 
+             role: session.target_role, 
+             difficulty: session.difficulty || 'intermediate' 
+          });
+       }
+
+       if (nextRoundQuestions.length > 0) {
+          for (const q of nextRoundQuestions) {
+             const nextQsInsert = {
+                interview_id: session.id,
+                round_number: currentRoundNum,
+                question_type: currentRoundNum === 5 ? 'hr' : 'dsa',
+                subject: currentRoundNum === 5 ? 'HR' : 'DSA',
+                topic: q.topic || q.subject || (currentRoundNum === 5 ? 'Behavioral' : 'DSA'),
+                question_text: q.questionText || q.problemStatement || q.question_text || "",
+                test_cases: q.test_cases || q.testCases || [],
+                hints: q.hints || null,
+                solution_approach: q.solution_approach || null
+             };
+             const { data: inserted } = await supabase.from("interview_questions").insert(nextQsInsert).select();
+             if (inserted) session.interview_questions.push(...inserted);
+          }
+       }
+    }
+
     res.json(session);
   } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ──────────────────────────────────────────────────
+//  V2 — List Interviews
+//  GET /api/interview
+// ──────────────────────────────────────────────────
+exports.listInterviews = async (req, res) => {
+  try {
+    const authData = typeof req.auth === 'function' ? req.auth() : req.auth;
+    const userId = authData?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const limit = parseInt(req.query.limit) || 10;
+    const offset = parseInt(req.query.offset) || 0;
+
+    const { data: interviews, error } = await supabase
+      .from("interviews")
+      .select("id, target_role, difficulty, type, status, current_round, total_rounds, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error("[DATABASE ERROR] List Interviews Failed:", error);
+      return res.status(400).json({ message: error.message });
+    }
+
+    res.json({ success: true, data: { sessions: interviews || [] } });
+  } catch (err) {
+    console.error("[V2 List Interviews] Exception:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ──────────────────────────────────────────────────
+//  V2 — Get Results
+//  GET /api/interview/:id/results
+// ──────────────────────────────────────────────────
+exports.getResults = async (req, res) => {
+  try {
+    const authData = typeof req.auth === 'function' ? req.auth() : req.auth;
+    const userId = authData?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const cleanId = req.params.id.replace('sess_', '');
+
+    const { data: results, error } = await supabase
+      .from("interviews")
+      .select("*, interview_questions(*), interview_responses(*), interview_round_summaries(*)")
+      .eq("id", cleanId)
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !results) {
+      console.error("[DATABASE ERROR] Get Results Failed:", error);
+      return res.status(404).json({ message: "Results not found" });
+    }
+
+    res.json(results);
+  } catch (err) {
+    console.error("[V2 Get Results] Exception:", err);
     res.status(500).json({ message: err.message });
   }
 };

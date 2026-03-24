@@ -1,0 +1,1 @@
+fetch('http://localhost:8001/interview/start', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({role: 'Frontend', difficulty: 'intermediate', roundType: 'mcq'}) }).then(async r => { console.log('Status:', r.status); console.log('Body:', await r.text()); }).catch(e => console.error(e));

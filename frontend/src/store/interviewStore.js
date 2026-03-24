@@ -38,6 +38,7 @@ const useInterviewStore = create(
       dsaTestResults: [],
       dsaAttempts: 0,
       dsaQuestion: null,
+      lastDSASubmission: null,
       
       // HR STATE
       hrQuestions: [],
@@ -59,9 +60,9 @@ const useInterviewStore = create(
           roundType: round.roundType,
           roundData: round, // Backwards compatibility for now
           // If the round data has questions, populate them
-          mcqQuestions: round.roundType === 'mcq' || round.roundType === 'technical' ? round.questions || [] : [],
-          dsaQuestion: round.roundType === 'coding' ? round.questions?.[0] || round.questions || null : null,
-          hrQuestions: round.roundType === 'behavioural' ? round.questions || [] : [],
+          mcqQuestions: (round.roundType === 'mcq' || round.roundType === 'technical') ? round.questions || [] : [],
+          dsaQuestion: (round.roundType === 'coding' || round.roundType === 'dsa') ? round.questions?.[0] || round.questions || null : null,
+          hrQuestions: (round.roundType === 'behavioural' || round.roundType === 'behavioral' || round.roundType === 'hr') ? round.questions || [] : [],
           roundStatus: session.status === 'completed' ? 'complete' : 'active',
           isInterviewComplete: session.status === 'completed',
           mcqAnswers: {},
@@ -104,13 +105,36 @@ const useInterviewStore = create(
 
           const { roundSummary, nextRound, isComplete } = res;
           
-          set((state) => ({
-            roundSummaries: [...state.roundSummaries, roundSummary],
-            roundStatus: isComplete ? 'complete' : 'summary',
-            nextRoundData: nextRound,
-            isInterviewComplete: isComplete,
-            mcqScore: roundSummary.score || 0
-          }));
+          if (isComplete) {
+            set((state) => ({
+              roundSummaries: [...state.roundSummaries, roundSummary],
+              roundStatus: 'complete',
+              isInterviewComplete: true,
+              mcqScore: roundSummary.score || 0
+            }));
+          } else {
+            // SKIP SUMMARY: Directly proceed to next round
+            set((state) => ({
+              roundSummaries: [...state.roundSummaries, roundSummary],
+              currentRound: nextRound.roundNumber,
+              roundType: nextRound.roundType,
+              roundData: nextRound,
+              roundStatus: 'active',
+              nextRoundData: null,
+              mcqScore: roundSummary.score || 0,
+              
+              // Reset MCQ specific state
+              mcqQuestions: (nextRound.roundType === 'mcq' || nextRound.roundType === 'technical') ? nextRound.questions || [] : [],
+              dsaQuestion: (nextRound.roundType === 'coding' || nextRound.roundType === 'dsa') ? nextRound.questions?.[0] || nextRound.questions || null : null,
+              hrQuestions: (nextRound.roundType === 'behavioural' || nextRound.roundType === 'behavioral' || nextRound.roundType === 'hr') ? nextRound.questions || [] : [],
+              mcqAnswers: {},
+              mcqCurrentIndex: 0,
+              dsaTestResults: [],
+              dsaAttempts: 0,
+              hrAnswers: {},
+              hrCurrentIndex: 0
+            }));
+          }
         } catch (err) {
           console.error("MCQ round submission failed", err);
           set({ roundStatus: 'active' });
@@ -166,10 +190,13 @@ const useInterviewStore = create(
              });
              set((state) => ({
                 roundSummaries: [...state.roundSummaries, compRes.roundSummary],
-                roundStatus: compRes.isComplete ? 'complete' : 'summary',
+                lastDSASubmission: compRes,
                 nextRoundData: compRes.nextRound,
-                isInterviewComplete: compRes.isComplete
+                isInterviewComplete: compRes.isComplete,
+                // Stay 'active' or 'submitting' so component can show success modal
+                // status will be manually set to 'summary' by modal button
              }));
+             return { ...res, compRes };
           } else {
              set({ roundStatus: 'active' });
           }
@@ -215,6 +242,10 @@ const useInterviewStore = create(
 
       setHRIndex: (index) => set({ hrCurrentIndex: index }),
 
+    setRoundStatus: (status) => set({ roundStatus: status }),
+
+    clearLastSubmission: () => set({ lastDSASubmission: null }),
+
       proceedToNextRound: () => {
         const { nextRoundData } = get();
         if (nextRoundData) {
@@ -225,9 +256,9 @@ const useInterviewStore = create(
             roundStatus: 'active',
             nextRoundData: null,
             // Reset local states for the new round
-            mcqQuestions: nextRoundData.roundType === 'mcq' || nextRoundData.roundType === 'technical' ? nextRoundData.questions || [] : [],
-            dsaQuestion: nextRoundData.roundType === 'coding' ? nextRoundData.questions?.[0] || nextRoundData.questions || null : null,
-            hrQuestions: nextRoundData.roundType === 'behavioural' ? nextRoundData.questions || [] : [],
+            mcqQuestions: (nextRoundData.roundType === 'mcq' || nextRoundData.roundType === 'technical') ? nextRoundData.questions || [] : [],
+            dsaQuestion: (nextRoundData.roundType === 'coding' || nextRoundData.roundType === 'dsa') ? nextRoundData.questions?.[0] || nextRoundData.questions || null : null,
+            hrQuestions: (nextRoundData.roundType === 'behavioural' || nextRoundData.roundType === 'behavioral' || nextRoundData.roundType === 'hr') ? nextRoundData.questions || [] : [],
             mcqAnswers: {},
             mcqCurrentIndex: 0,
             dsaTestResults: [],
