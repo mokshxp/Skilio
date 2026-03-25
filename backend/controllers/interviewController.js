@@ -914,25 +914,47 @@ exports.deleteInterview = async (req, res) => {
 
     const cleanId = req.params.id.replace('sess_', '');
     
-    // Deleting from 'interviews' should cascade if setup correctly.
-    // If not, we manually clean up.
-    await supabase.from("session_questions").delete().eq("session_id", cleanId);
-    await supabase.from("question_attempts").delete().eq("session_id", cleanId);
-    await supabase.from("interview_round_summaries").delete().eq("interview_id", cleanId);
-    await supabase.from("interview_responses").delete().eq("interview_id", cleanId);
+    console.log(`[DeleteInterview] Starting cleanup for session ${cleanId} (User: ${userId})`);
 
-    const { error } = await supabase
+    // 1. Clean up all related tables to avoid FK violations and stale data
+    // Some use 'interview_id', others use 'session_id'
+    const cleanupOperations = [
+      supabase.from("session_questions").delete().eq("session_id", cleanId),
+      supabase.from("question_attempts").delete().eq("session_id", cleanId),
+      supabase.from("interview_round_summaries").delete().eq("interview_id", cleanId),
+      supabase.from("interview_responses").delete().eq("interview_id", cleanId),
+      supabase.from("interview_questions").delete().eq("interview_id", cleanId),
+      supabase.from("adaptive_tracking").delete().eq("interview_id", cleanId),
+      supabase.from("coding_problems").delete().eq("interview_id", cleanId),
+      supabase.from("questions").delete().eq("interview_id", cleanId),
+      supabase.from("user_answers").delete().eq("interview_id", cleanId),
+      supabase.from("interview_sessions").delete().eq("id", cleanId).eq("user_id", userId),
+    ];
+
+    const results = await Promise.allSettled(cleanupOperations);
+    results.forEach((res, i) => {
+       if (res.status === 'rejected') {
+          console.warn(`[DeleteInterview] Step ${i} failed:`, res.reason);
+       }
+    });
+
+    // 2. Finally delete the main interview record
+    const { error: deleteError } = await supabase
       .from("interviews")
       .delete()
       .eq("id", cleanId)
       .eq("user_id", userId);
 
-    if (error) throw error;
+    if (deleteError) {
+       console.error("[DeleteInterview] Main delete failed:", deleteError);
+       throw deleteError;
+    }
 
+    console.log(`[DeleteInterview] Successfully deleted session ${cleanId}`);
     res.json({ message: "Interview deleted successfully" });
 
   } catch (err) {
-    console.error("[V2 Delete Interview]", err);
+    console.error("[V2 Delete Interview] Exception:", err);
     res.status(500).json({ message: err.message });
   }
 };
