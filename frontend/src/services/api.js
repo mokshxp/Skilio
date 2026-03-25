@@ -65,6 +65,10 @@ export const interviewApi = {
     completeRound: (id, payload) => api.post(`/interview/round/complete`, { ...payload, interviewId: id }).then(res => res.data),
     submitDSA: (payload) => api.post('/interview/dsa/submit', payload).then(res => res.data),
     runDSA: (payload) => api.post('/interview/dsa/run', payload).then(res => res.data),
+    delete: (id) => {
+        const cleanId = id.toString().replace('sess_', '');
+        return api.delete(`/interview/${cleanId}`).then(res => res.data);
+    },
     end: (id) => api.post('/interview/end', { interviewId: id }).then(res => res.data),
 }
 

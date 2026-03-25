@@ -862,37 +862,41 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0;
-  background: #1a1a1a;
-  color: #fff !important;
+  background: var(--accent); /* Uses theme accent (Terracotta/Amber) */
+  color: #ffffff !important;
   font-size: 14.5px;
-  font-weight: 600;
+  font-weight: 700;
   border: none;
   border-radius: 100px;
   cursor: pointer;
   text-decoration: none !important;
   padding: 6px 6px 6px 24px;
-  transition: background 0.22s ease, transform 0.22s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.22s ease;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
   line-height: 1;
+  box-shadow: 0 4px 14px var(--accent-glow);
 }
 
 .btn-primary:hover {
-  background: #C85E2A;
-  transform: translateY(-3px);
-  box-shadow: 0 10px 28px rgba(200, 94, 42, 0.28);
+  filter: brightness(1.1);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 8px 30px var(--accent-glow);
+  color: #ffffff !important;
 }
 
 .btn-primary-icon {
   width: 36px; height: 36px;
-  background: #C85E2A;
+  background: rgba(255, 255, 255, 0.2); /* Integrated glass pill */
+  backdrop-filter: blur(4px);
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   margin-left: 16px;
   font-size: 17px;
-  transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.22s;
+  color: #ffffff;
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
 }
 
 .btn-primary:hover .btn-primary-icon {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.35);
   transform: rotate(20deg) scale(1.1);
 }
 
@@ -901,12 +905,12 @@ body {
   align-items: center;
   gap: 9px;
   background: transparent;
-  color: #1a1a1a !important;
+  color: var(--text-0) !important;
   font-size: 14.5px;
   font-weight: 500;
   padding: 13px 22px;
   border-radius: 100px;
-  border: 1.5px solid #C5BAB0;
+  border: 1.5px solid var(--border-hi);
   cursor: pointer;
   text-decoration: none !important;
   transition: all 0.22s cubic-bezier(0.34,1.56,0.64,1);
@@ -918,7 +922,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: #1a1a1a;
+  background: var(--text-0);
   border-radius: 100px;
   transform: scaleX(0);
   transform-origin: left;
@@ -928,8 +932,8 @@ body {
 
 .btn-secondary:hover::before { transform: scaleX(1); }
 .btn-secondary:hover { 
-  color: #fff !important; 
-  border-color: #1a1a1a; 
+  color: var(--bg-0) !important; 
+  border-color: var(--text-0); 
   transform: translateY(-3px); 
 }
 .btn-secondary > * { position: relative; z-index: 1; }
@@ -1720,9 +1724,10 @@ body {
 }
 
 .skilio-nav-upgrade:hover {
-  background: #D4663A; /* Slightly lighter orange */
+  background: var(--accent); /* Consistent lighter logic handled by filter if needed, but var is safer */
+  filter: brightness(1.1);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(196, 80, 26, 0.35);
+  box-shadow: 0 6px 18px var(--accent-glow);
 }
 
 /* Avatar */

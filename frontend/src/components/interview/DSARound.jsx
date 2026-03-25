@@ -20,13 +20,21 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const DSARound = ({ question }) => {
+const fmt = (val) => {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'object') return JSON.stringify(val);
+  return String(val);
+};
+
+const DSARound = ({ questions = [] }) => {
   const { 
     dsaCode, 
     dsaLanguage, 
     dsaTestResults, 
     updateDSACode, 
     setDSALanguage, 
+    dsaCurrentIndex,
+    setDSAIndex,
     runDSACode, 
     submitDSACode,
     roundStatus,
@@ -37,16 +45,48 @@ const DSARound = ({ question }) => {
     clearLastSubmission
   } = useInterviewStore();
 
+  const question = questions[dsaCurrentIndex];
+
   const [activeTab, setActiveTab] = useState('problem');
   const [outputTab, setOutputTab] = useState('results');
   const [isExecuting, setIsExecuting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(2700);
   const [showResultModal, setShowResultModal] = useState(false);
+  const [editorTheme, setEditorTheme] = useState('vs-dark');
 
   useEffect(() => {
-    const signature = question?.function_signature || question?.functionSignatures || question?.starter_code;
-    if (!dsaCode[dsaLanguage] && signature?.[dsaLanguage]) {
-      updateDSACode(dsaLanguage, signature[dsaLanguage]);
+    const checkTheme = () => {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'midnight' || 
+                     document.documentElement.getAttribute('data-theme') === 'carbon';
+      setEditorTheme(isDark ? 'vs-dark' : 'vs');
+    };
+    checkTheme();
+    // Watch for dynamic theme changes
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!question) return;
+    const sigs = question.function_signatures || question.functionSignatures || question.starter_code;
+    if (!sigs) return;
+
+    // Auto-select javascript first, then fallback to first available
+    const preferred = ['javascript', 'python', 'java', 'cpp'];
+    const available = preferred.find(l => sigs[l]);
+    if (available && !dsaCode[available]) {
+      setDSALanguage(available);
+      updateDSACode(available, sigs[available]);
+    }
+  }, [question]);
+
+  // Separate effect: when language changes, load its signature
+  useEffect(() => {
+    if (!question) return;
+    const sigs = question.function_signatures || question.functionSignatures || question.starter_code;
+    if (sigs?.[dsaLanguage] && !dsaCode[dsaLanguage]) {
+      updateDSACode(dsaLanguage, sigs[dsaLanguage]);
     }
   }, [dsaLanguage, question]);
 
@@ -83,10 +123,16 @@ const DSARound = ({ question }) => {
     setIsExecuting(false);
   };
 
-  const proceedToSummary = () => {
+  const proceedToNextIndex = () => {
     const isComplete = lastDSASubmission?.isComplete;
     clearLastSubmission();
-    setRoundStatus(isComplete ? 'complete' : 'summary');
+    
+    if (dsaCurrentIndex < questions.length - 1) {
+      setDSAIndex(dsaCurrentIndex + 1);
+      setShowResultModal(false);
+    } else {
+      setRoundStatus(isComplete ? 'complete' : 'summary');
+    }
   };
 
   if (!question) return <div className="p-12 text-center text-neutral-500">Loading DSA Problem...</div>;
@@ -131,10 +177,10 @@ const DSARound = ({ question }) => {
                   {question.topic || question.title || "Coding Quest"}
                 </h1>
                 <div className="flex items-center gap-3">
-                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-2)] border border-[var(--border)] text-[10px] font-black uppercase tracking-wider text-[var(--text-1)]">
                      <Cpu className="w-3 h-3" /> {question.subject || 'Algorithms'}
                    </div>
-                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                   <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--bg-2)] border border-[var(--border)] text-[10px] font-black uppercase tracking-wider text-[var(--text-1)]">
                      <Activity className="w-3 h-3" /> {timeLeft < 300 ? 'Low Time' : 'Deep Work'}
                    </div>
                 </div>
@@ -149,15 +195,17 @@ const DSARound = ({ question }) => {
                   <div className="space-y-6">
                     <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-neutral-600">Illustrations</h4>
                     {question.examples.map((ex, i) => (
-                      <div key={i} className="group border rounded-3xl p-6 space-y-4 shadow-sm hover:border-[var(--accent-glow)] transition-all bg-[rgba(255,255,255,0.01)]" style={{ borderColor: 'var(--border)' }}>
-                        <div className="font-mono text-[13px] leading-relaxed">
-                          <span className="text-[var(--accent)] font-bold">Input:</span> <span className="text-[var(--text-0)]">{ex.input}</span>
+                      <div key={i} className="group border rounded-2xl p-5 space-y-3 transition-all bg-[var(--bg-2)] hover:border-[var(--accent)]" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex items-start gap-4 font-mono text-[13px]">
+                          <span className="text-[var(--accent)] font-black uppercase text-[10px] tracking-widest pt-1">Input</span>
+                          <span className="flex-1 text-[var(--text-0)] bg-black/5 p-2 rounded-lg border border-black/5">{fmt(ex.input)}</span>
                         </div>
-                        <div className="font-mono text-[13px] leading-relaxed">
-                          <span className="text-emerald-500 font-bold">Output:</span> <span className="text-[var(--text-0)]">{ex.output}</span>
+                        <div className="flex items-start gap-4 font-mono text-[13px]">
+                          <span className="text-emerald-500 font-black uppercase text-[10px] tracking-widest pt-1">Output</span>
+                          <span className="flex-1 text-[var(--text-0)] bg-black/5 p-2 rounded-lg border border-black/5">{fmt(ex.output)}</span>
                         </div>
                         {ex.explanation && (
-                          <div className="text-[12px] italic opacity-50 pl-4 border-l-2" style={{ borderColor: 'var(--border)' }}>
+                          <div className="text-[11px] text-[var(--text-2)] pl-4 border-l-2 py-1 leading-relaxed" style={{ borderColor: 'var(--accent-glow)' }}>
                              {ex.explanation}
                           </div>
                         )}
@@ -206,12 +254,12 @@ const DSARound = ({ question }) => {
         {/* Editor Toolbar */}
         <div className="h-20 flex items-center justify-between px-8 border-b" style={{ background: 'var(--bg-1)', borderColor: 'var(--border)' }}>
           <div className="flex items-center gap-4">
-            <div className="px-5 py-2 rounded-2xl bg-[var(--bg-2)] border border-[var(--border)] flex items-center gap-3">
+            <div className="px-5 py-2 rounded-2xl bg-[var(--bg-1)] border border-[var(--border)] flex items-center gap-3 focus-within:border-[var(--accent)] transition-all">
                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                <select 
                  value={dsaLanguage}
                  onChange={(e) => setDSALanguage(e.target.value)}
-                 className="bg-transparent text-[10px] font-black uppercase tracking-[0.2em] focus:outline-none cursor-pointer"
+                 className="bg-transparent text-[10px] font-black uppercase tracking-[0.2em] focus:outline-none cursor-pointer outline-none border-none ring-0 appearance-none pr-4"
                  style={{ color: 'var(--text-1)' }}
                >
                  <option value="python">Python 3</option>
@@ -226,7 +274,7 @@ const DSARound = ({ question }) => {
              <button 
                onClick={handleRun}
                disabled={isExecuting}
-               className="flex items-center gap-3 px-6 py-3 rounded-2xl transition-all border font-black text-[10px] uppercase tracking-[0.2em] bg-neutral-900 border-neutral-800 hover:bg-neutral-800 text-white shadow-lg active:scale-95 disabled:opacity-50"
+               className="flex items-center gap-3 px-6 py-3 rounded-2xl transition-all border font-black text-[10px] uppercase tracking-[0.2em] bg-[var(--bg-2)] border-[var(--border)] hover:bg-[var(--bg-3)] text-[var(--text-0)] shadow-lg active:scale-95 disabled:opacity-50"
              >
                {isExecuting ? <div className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
                Dry Run
@@ -247,8 +295,8 @@ const DSARound = ({ question }) => {
         <div className="flex-1 min-h-0 bg-[#0A0B10]">
           <Editor
             height="100%"
-            theme="vs-dark"
-            language={dsaLanguage === 'cpp' ? 'cpp' : (dsaLanguage === 'python' ? 'python' : 'javascript')}
+            theme={editorTheme}
+            language={dsaLanguage === 'cpp' ? 'cpp' : (dsaLanguage === 'python' ? 'python' : (dsaLanguage === 'java' ? 'java' : 'javascript'))}
             value={dsaCode[dsaLanguage] || ""}
             onChange={(val) => updateDSACode(dsaLanguage, val)}
             options={{
@@ -297,8 +345,8 @@ const DSARound = ({ question }) => {
                         <div className="w-2 h-2 rounded-full bg-neutral-800" />
                      </div>
                      <div className="space-y-1.5 opacity-80">
-                        <div className="flex gap-2"><span className="text-[var(--accent)] font-bold">In:</span> <span>{tc.input}</span></div>
-                        <div className="flex gap-2"><span className="text-emerald-500 font-bold">Ex:</span> <span>{tc.expectedOutput || tc.expected}</span></div>
+                        <div className="flex gap-2"><span className="text-[var(--accent)] font-bold">In:</span> <span>{fmt(tc.input)}</span></div>
+                        <div className="flex gap-2"><span className="text-emerald-500 font-bold">Ex:</span> <span>{fmt(tc.expectedOutput || tc.expected)}</span></div>
                      </div>
                    </div>
                  ))}
@@ -320,24 +368,27 @@ const DSARound = ({ question }) => {
                          <span className="text-xs font-black text-neutral-500 uppercase tracking-widest">{dsaTestResults.filter(r => r.passed).length} / {dsaTestResults.length} Units Passed</span>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="grid grid-cols-1 gap-2">
                         {dsaTestResults.map((res, i) => (
-                          <div key={i} className="group bg-neutral-900/40 border border-neutral-800/50 rounded-2xl p-5 flex items-center justify-between hover:bg-neutral-900/60 transition-colors">
-                             <div className="flex items-center gap-5">
-                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${res.passed ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
-                                   {res.passed ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                                </div>
+                          <div key={i} className="group bg-[var(--bg-2)] border rounded-xl px-6 py-3 flex items-center justify-between hover:border-[var(--accent-glow)] transition-all" style={{ borderColor: 'var(--border)' }}>
+                             <div className="flex items-center gap-4">
+                                <div className={`w-2 h-2 rounded-full ${res.passed ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`} />
                                 <div className="flex flex-col">
-                                   <span className="text-xs font-bold text-neutral-300">Unit #{res.id || i+1}</span>
-                                   {!res.passed && <span className="text-[10px] text-rose-400/80 mt-0.5">Mismatched output recorded.</span>}
+                                   <span className="text-[11px] font-black uppercase tracking-widest text-[var(--text-0)]">Unit #{res.id || i+1}</span>
+                                   {!res.passed && <span className="text-[10px] text-rose-500 font-bold">Assertion Failure</span>}
                                 </div>
                              </div>
-                             <div className="flex items-center gap-6">
+                             
+                             <div className="flex items-center gap-8">
                                 <div className="flex flex-col items-end">
-                                   <span className="text-[10px] font-black text-neutral-600 uppercase tracking-widest">Time</span>
-                                   <span className="text-[11px] font-bold text-neutral-400">{res.runtime || '38ms'}</span>
+                                   <span className="text-[9px] font-black text-[var(--text-2)] uppercase tracking-tighter">Latency</span>
+                                   <span className="text-[11px] font-bold text-[var(--text-1)]">{res.runtime || '38ms'}</span>
                                 </div>
-                                <ChevronRight className="w-4 h-4 text-neutral-800" />
+                                <div className="flex flex-col items-end">
+                                   <span className="text-[9px] font-black text-[var(--text-2)] uppercase tracking-tighter">Status</span>
+                                   <span className={`text-[11px] font-bold ${res.passed ? 'text-emerald-500' : 'text-rose-500'}`}>{res.passed ? 'PASS' : 'FAIL'}</span>
+                                </div>
+                                <ChevronRight className="w-4 h-4 text-[var(--text-2)] opacity-30 group-hover:opacity-100 transition-opacity" />
                              </div>
                           </div>
                         ))}
@@ -410,15 +461,15 @@ const DSARound = ({ question }) => {
                     </div>
                  </div>
 
-                 <div className="p-8 bg-black/40 rounded-[2rem] border border-neutral-900 text-left relative overflow-hidden group">
+                 <div className="p-8 bg-[var(--bg-card)] rounded-[2rem] border border-[var(--border)] text-left relative overflow-hidden group">
                     <Info className="absolute -top-4 -right-4 w-20 h-20 text-white/5 group-hover:scale-125 transition-transform" />
-                    <p className="text-sm leading-relaxed text-neutral-400 italic font-medium relative">
+                    <p className="text-sm leading-relaxed text-[var(--text-1)] italic font-medium relative">
                        "{evaluation.feedback}"
                     </p>
                  </div>
 
                  <button 
-                  onClick={proceedToSummary}
+                  onClick={proceedToNextIndex}
                   className="w-full py-6 rounded-[2rem] text-white font-black uppercase text-xs tracking-[0.5em] transition-all flex items-center justify-center gap-4 group"
                   style={{ background: 'var(--accent)', boxShadow: '0 20px 40px rgba(196,82,42,0.3)' }}
                  >

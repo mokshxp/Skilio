@@ -37,15 +37,15 @@ const InterviewRoom = () => {
         // Fetching from confirmed backend route: /interview/session/:id
         const data = await interviewApi.get(interviewId); 
         
-        const currentRoundNum = data.current_round;
-        const currentRoundQs = data.interview_questions.filter(q => q.round_number === currentRoundNum);
+        const currentRoundNum = Number(data.current_round);
+        const currentRoundQs = (data.interview_questions || []).filter(q => Number(q.round_number) === currentRoundNum);
         
         initSession({
           interviewId,
           session: data,
           round: {
             roundNumber: currentRoundNum,
-            roundType: currentRoundQs[0]?.question_type || 'mcq',
+            roundType: currentRoundQs[0]?.question_type || data.type || 'mcq',
             questions: currentRoundQs
           }
         });
@@ -99,18 +99,26 @@ const InterviewRoom = () => {
       return <FinalReport roundSummaries={roundSummaries} session={session} />;
     }
 
-    switch (roundType) {
+    // Normalize round type and handle aliases
+    const type = roundType?.toLowerCase().trim();
+
+    switch (type) {
       case 'mcq':
+      case 'technical':
         return <MCQRound questions={roundData?.questions || []} />;
       case 'dsa':
-        return <DSARound question={roundData?.questions?.[0]} />;
+      case 'coding':
+        return <DSARound questions={roundData?.questions || []} />;
       case 'hr':
+      case 'behavioural':
+      case 'behavioral':
+      case 'text':
         return <HRRound questions={roundData?.questions || []} />;
       default:
         return (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
              <RefreshCcw className="w-12 h-12 animate-spin-slow" style={{ color: 'var(--text-2)' }} />
-             <p className="font-bold uppercase tracking-widest text-xs tracking-widest" style={{ color: 'var(--text-2)' }}>Awaiting Round Data...</p>
+             <p className="font-bold uppercase tracking-widest text-xs tracking-widest" style={{ color: 'var(--text-2)' }}>Awaiting Round Data ({roundType || 'Unknown'})...</p>
           </div>
         );
     }

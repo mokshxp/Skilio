@@ -1,3 +1,4 @@
+const axios = require("axios");
 const {
   generateMCQBatch,
   generateDSAProblemBatch,
@@ -355,7 +356,7 @@ exports.completeRound = async (req, res) => {
       .insert({
         interview_id: interviewId,
         round_number: roundNumber,
-        round_type: roundNumber <= 2 ? 'mcq' : (roundNumber <= 4 ? 'dsa' : 'hr'),
+        round_type: roundNumber === 1 ? 'mcq' : (roundNumber <= 4 ? 'dsa' : 'hr'),
         score: score,
         correct_count: correctCount,
         total_count: totalCount,
@@ -383,6 +384,8 @@ exports.completeRound = async (req, res) => {
         difficulty: nextRoundNumber === 2 ? 'easy' : (nextRoundNumber === 3 ? 'medium' : 'hard'),
         roundNumber: nextRoundNumber
       });
+      console.log('[DSA DEBUG] title:', nextRoundQuestions?.title);
+      console.log('[DSA DEBUG] type:', Array.isArray(nextRoundQuestions) ? 'ARRAY (bad)' : 'OBJECT (good)');
     } else if (nextRoundNumber === 5) {
       nextRoundType = 'hr';
       nextRoundQuestions = await generateHRBatch({
@@ -392,7 +395,8 @@ exports.completeRound = async (req, res) => {
     }
 
     // 7. Process questions into the new schema
-    for (const q of nextRoundQuestions) {
+    const questionsArr = Array.isArray(nextRoundQuestions) ? nextRoundQuestions : [nextRoundQuestions];
+    for (const q of questionsArr) {
       if (nextRoundType === 'dsa') {
         // A. Upsert to base question bank
         const slug = q.slug || q.question_slug || (q.title ? q.title.toLowerCase().replace(/\s+/g, '-') : 'problem');
@@ -424,26 +428,38 @@ exports.completeRound = async (req, res) => {
       }
 
       // Also keep interview_questions for backward compatibility/unified MCQ flow
-      const nextQsInsert = [{
+      let nextQsInsert = {
         interview_id: interviewId,
         round_number: nextRoundNumber,
-        question_type: nextRoundType,
-        question_text: q.questionText || q.problemStatement || q.question_text || "",
-        question_slug: q.slug || q.question_slug || null,
-        subject: q.subject || null,
-        topic: q.topic || q.title || q.subject || null,
+        question_type: nextRoundType === 'dsa' ? 'coding' : nextRoundType,
         difficulty: q.difficulty || interview.difficulty,
-        options: q.options || null,
-        correct_answer: q.correct_answer || q.correctAnswer || null,
-        explanation: q.explanation || null,
-        function_signature: q.function_signature || q.functionSignatures || q.starter_code || null,
-        examples: q.examples || null,
-        constraints: q.constraints || null,
-        test_cases: q.test_cases || q.testCases || null,
-        hints: q.hints || null,
-        solution_approach: q.solution_approach || null
-      }];
-      const { data: insData, error: insErr } = await supabase.from("interview_questions").insert(nextQsInsert).select();
+        topic: q.topic || q.title || q.subject || null,
+      };
+
+      if (nextRoundType === 'dsa') {
+        Object.assign(nextQsInsert, {
+          question_text: q.title || "Coding Challenge",
+          slug: q.slug || q.question_slug || null,
+          subject: 'DSA',
+          problem_statement: q.problemStatement || q.question_text || "",
+          function_signatures: q.functionSignatures || q.function_signature || null,
+          examples: q.examples || null,
+          test_cases: q.test_cases || q.testCases || null,
+          hints: q.hints || null,
+          constraints: q.constraints || null,
+          time_complexity_expected: q.timeComplexityExpected || null,
+          space_complexity_expected: q.spaceComplexityExpected || null,
+        });
+      } else {
+        Object.assign(nextQsInsert, {
+          question_text: q.questionText || q.question_text || "",
+          options: q.options || null,
+          correct_answer: q.correct_answer || q.correctAnswer || null,
+          explanation: q.explanation || null,
+        });
+      }
+
+      const { data: insData, error: insErr } = await supabase.from("interview_questions").insert([nextQsInsert]).select();
       if (insErr) {
         console.error("❌ [V2] Failed to insert interview_question:", insErr);
         // If we can't save the questions, we should NOT move the interview round forward
@@ -494,6 +510,91 @@ exports.completeRound = async (req, res) => {
   }
 };
 
+// ── Internal Helper: Execute on Piston ───────────────────────
+const executeOnPiston = async (code, language, stdin = "") => {
+  try {
+    const PISTON_URL = "https://emkc.org/api/v2/piston/execute";
+    // Map project names to Piston language keys
+    const langMap = {
+      'python': { language: 'python', version: '3.10.0' },
+      'javascript': { language: 'javascript', version: '18.15.0' },
+      'js': { language: 'javascript', version: '18.15.0' },
+      'java': { language: 'java', version: '15.0.2' },
+      'cpp': { language: 'cpp', version: '10.2.0' },
+      'c++': { language: 'cpp', version: '10.2.0' },
+    };
+
+    const selectedLang = langMap[language.toLowerCase()] || langMap['python'];
+    console.log("[PISTON REQUEST]", { 
+      language: selectedLang.language, 
+      version: selectedLang.version, 
+      hasCode: !!code 
+    });
+
+    const payload = {
+      language: selectedLang.language,
+      version: selectedLang.version,
+      files: [{ content: code }],
+      stdin: stdin
+    };
+
+    console.log("FINAL PAYLOAD:", payload);
+
+    const response = await axios.post(PISTON_URL, payload, {
+      headers: {} // clears any defaults to avoid 401
+    });
+    console.log(`[PISTON] Response status: ${response.status}`);
+    return response.data.run; // { stdout, stderr, code, signal, output }
+  } catch (err) {
+    console.error("[PISTON_ERROR]", err.message);
+    return { stdout: "", stderr: "Execution engine failed", code: 1 };
+  }
+};
+
+// ── Internal Helper: Wrap user code with test harness ───────
+const wrapCodeWithHarness = (code, language, input) => {
+  // AI sometimes puts labels like 's = "..."'. Strip them.
+  let cleanInput = String(input || "").replace(/^[a-zA-Z0-9_]+\s*=\s*/, "").trim();
+  
+  // If it's a string not wrapped in quotes, wrap it for JSON
+  if (cleanInput.startsWith('"') && !cleanInput.endsWith('"')) cleanInput += '"';
+  if (!cleanInput.startsWith('"') && !cleanInput.startsWith('[') && !cleanInput.startsWith('{') && isNaN(cleanInput)) {
+      cleanInput = `"${cleanInput}"`;
+  }
+
+  if (language === 'python' || language === 'python3') {
+    return `${code}\n\n# --- SMART DRIVER ---\nimport json\nimport types\ntry:\n    # Discovery: Find the first function defined in the user's code scope\n    func = globals().get('solve') or globals().get('solution')\n    if not func:\n        candidate_funcs = [v for k, v in globals().items() if isinstance(v, types.FunctionType) and k not in ['json', 'sys', 'types']]\n        if candidate_funcs: func = candidate_funcs[-1]\n\n    if func:\n        result = func(*json.loads('[${cleanInput}]'))\n        print(json.dumps(result))\n    else:\n        pass\nexcept Exception as e:\n    import sys\n    sys.stderr.write(str(e))\n    sys.exit(1)`;
+  }
+  if (language === 'javascript' || language === 'js') {
+    return `${code}\n\n// --- SMART DRIVER ---\ntry {\n    let fn = (typeof solve === 'function') ? solve : (typeof solution === 'function' ? solution : null);\n    if (!fn) {\n        const keys = Object.keys(global).filter(k => typeof global[k] === 'function' && !['setTimeout', 'setInterval', 'console'].includes(k));\n        if (keys.length > 0) fn = global[keys[keys.length-1]];\n    }\n    if (fn) {\n        const result = fn(...JSON.parse('[${cleanInput}]'));\n        console.log(result !== undefined ? JSON.stringify(result) : "INTERNAL_NULL_RETURN");\n    }\n} catch (e) {\n    console.error(e.message);\n    process.exit(1);\n}`;
+  }
+  if (language === 'java') {
+      // Find method name from code
+      const match = code.match(/(?:public|private|int|String|List|void)\s+([a-zA-Z0-9_]+)\s*\(/);
+      const methodName = match ? match[1] : "solve";
+      return `import java.util.*;\nimport java.util.stream.*;\n${code}\n\npublic class Main {\n    public static void main(String[] args) {\n        try {\n            Solution sol = new Solution();\n            // This is a naive but common driver for DSA\n            System.out.println(sol.${methodName}(args[0]));\n        } catch(Exception e) {\n            System.out.println("INTERNAL_NULL_RETURN");\n        }\n    }\n}`;
+  }
+  return code;
+};
+
+// ── Shared Helper: Strict Comparison ───────
+const compareResults = (rawOutput, rawExpected) => {
+    const out = String(rawOutput || "").trim();
+    const exp = String(rawExpected || "").trim();
+
+    if (!out || out === "INTERNAL_NULL_RETURN") {
+        return exp === "" || exp === "null";
+    }
+
+    try {
+        if ((out.startsWith('[') || out.startsWith('{')) && (exp.startsWith('[') || exp.startsWith('{'))) {
+            return JSON.stringify(JSON.parse(out)) === JSON.stringify(JSON.parse(exp));
+        }
+    } catch (e) {}
+
+    return out === exp;
+};
+
 // ──────────────────────────────────────────────────
 //  V2 — DSA Submit
 //  POST /api/interview/dsa/submit
@@ -505,20 +606,36 @@ exports.submitDSA = async (req, res) => {
     
     // 1. Fetch test cases
     const { data: question } = await supabase
-      .from("interview_questions")
-      .select("question_text, test_cases")
-      .eq("id", questionId)
-      .single();
+        .from("interview_questions")
+        .select("question_text, test_cases")
+        .eq("id", questionId)
+        .single();
 
-    // 2. Mocking Judge0 for now (should implement actual call)
-    const testResults = (question.test_cases || []).map(tc => ({
-      id: tc.id,
-      input: tc.input,
-      expected: tc.expectedOutput,
-      got: tc.expectedOutput, // MOCK: assume correct
-      passed: true,
-      runtime: "40ms"
-    }));
+    if (!question) return res.status(404).json({ error: "Question not found" });
+
+    // 2. Execute against ALL test cases in parallel
+    const testCases = question.test_cases || [];
+    const executionPromises = testCases.map(async (tc) => {
+        const harnessedCode = wrapCodeWithHarness(code, language, tc.input);
+        const result = await executeOnPiston(harnessedCode, language);
+        
+        // Normalize results
+        const rawOutput = result.stdout.trim();
+        const rawExpected = String(tc.expectedOutput || tc.expected || "").trim();
+        const passed = compareResults(rawOutput, rawExpected);
+
+        return {
+            id: tc.id,
+            input: tc.input,
+            expected: rawExpected,
+            got: rawOutput || (result.stderr ? "ERROR" : "NULL"),
+            passed: passed && result.code === 0,
+            runtime: "40ms", 
+            stderr: result.stderr
+        };
+    });
+
+    const testResults = await Promise.all(executionPromises);
 
     // 3. AI Evaluation
     let aiEval = await evaluateCode({
@@ -527,11 +644,9 @@ exports.submitDSA = async (req, res) => {
       language
     });
     
-    // Normalize from [obj]
     if (Array.isArray(aiEval)) aiEval = aiEval[0];
 
     // 4. Save response to both NEW and OLD tables
-    // Legacy mapping
     await supabase.from("interview_responses").insert({
       interview_id: interviewId,
       question_id: questionId,
@@ -539,26 +654,19 @@ exports.submitDSA = async (req, res) => {
       code_solution: code,
       language: language,
       test_results: testResults,
-      is_correct: aiEval.status === 'Accepted',
-      score: aiEval.score / 10,
+      is_correct: testResults.every(r => r.passed),
+      score: (testResults.filter(r => r.passed).length / testResults.length) * 10,
       ai_feedback: aiEval.feedback,
       improvements: aiEval.improvements
     });
 
-    // New Schema: question_attempts
-    // First, find the base_question_id if it exists
-    const { data: sessionQ } = await supabase
-      .from("session_questions")
-      .select("question_id")
-      .eq("session_id", interviewId)
-      .limit(1)
-      .maybeSingle();
-
+    // question_attempts (New Schema)
+    const { data: sessionQ } = await supabase.from("session_questions").select("question_id").eq("session_id", interviewId).limit(1).maybeSingle();
     const baseQuestionId = sessionQ?.question_id;
 
     await supabase.from("question_attempts").insert({
       session_id: interviewId,
-      question_id: baseQuestionId || questionId, // Fallback to current ID if session_question wasn't used
+      question_id: baseQuestionId || questionId,
       user_code: code,
       language: language,
       test_results: testResults,
@@ -567,20 +675,9 @@ exports.submitDSA = async (req, res) => {
       time_complexity: aiEval.runtime_estimate || aiEval.timeComplexity || "O(N)",
       space_complexity: aiEval.space_complexity || aiEval.spaceComplexity || "O(1)",
       ai_feedback: aiEval.feedback,
-      score: Math.round(aiEval.score || 0),
+      score: Math.round((testResults.filter(r => r.passed).length / testResults.length) * 100),
       submitted_at: new Date()
     });
-
-    // Update user history
-    const authData = typeof req.auth === 'function' ? req.auth() : req.auth;
-    const userId = authData?.userId;
-    if (userId && baseQuestionId) {
-      await supabase.from("user_question_history").upsert({
-        user_id: userId,
-        question_id: baseQuestionId,
-        seen_at: new Date()
-      }, { onConflict: 'user_id, question_id' });
-    }
 
     res.json({
       testResults,
@@ -588,7 +685,7 @@ exports.submitDSA = async (req, res) => {
       total: testResults.length,
       allPassed: testResults.every(r => r.passed),
       aiEvaluation: {
-        score: aiEval.score / 10,
+        score: testResults.every(r => r.passed) ? (aiEval.score / 10) : ((testResults.filter(r => r.passed).length / testResults.length) * 10),
         timeComplexity: aiEval.runtime_estimate || aiEval.timeComplexity,
         spaceComplexity: aiEval.space_complexity || aiEval.spaceComplexity,
         feedback: aiEval.feedback,
@@ -603,12 +700,11 @@ exports.submitDSA = async (req, res) => {
 };
 
 // ──────────────────────────────────────────────────
-//  V2 — DSA Run
+//  V2 — DSA Run (Dry Run)
 //  POST /api/interview/dsa/run
 // ──────────────────────────────────────────────────
 exports.runDSA = async (req, res) => {
   try {
-    const interviewId = req.body.interviewId?.toString().replace('sess_', '');
     const { questionId, code, language } = req.body;
     
     // 1. Fetch visible test cases
@@ -618,20 +714,33 @@ exports.runDSA = async (req, res) => {
       .eq("id", questionId)
       .single();
 
-    // 2. Mocking Judge0 (only visible test cases)
-    const visibleTCs = (question.test_cases || []).filter(tc => tc.isVisible);
-    const testResults = visibleTCs.map(tc => ({
-      id: tc.id,
-      input: tc.input,
-      expected: tc.expectedOutput,
-      got: tc.expectedOutput,
-      passed: true,
-      runtime: "30ms"
-    }));
+    const visibleTCs = (question.test_cases || []).filter(tc => tc.isVisible !== false).slice(0, 3);
+    
+    // 2. Execute on Piston
+    const executionPromises = visibleTCs.map(async (tc) => {
+        const harnessedCode = wrapCodeWithHarness(code, language, tc.input);
+        const result = await executeOnPiston(harnessedCode, language);
+        
+        const rawOutput = result.stdout.trim();
+        const rawExpected = String(tc.expectedOutput || tc.expected || "").trim();
+        const passed = compareResults(rawOutput, rawExpected);
+        
+        return {
+            id: tc.id,
+            input: tc.input,
+            expected: rawExpected,
+            got: rawOutput || (result.stderr ? result.stderr : "NULL"),
+            passed: passed && result.code === 0,
+            runtime: "30ms",
+            logs: result.stderr
+        };
+    });
+
+    const testResults = await Promise.all(executionPromises);
 
     res.json({
       testResults,
-      passed: testResults.length,
+      passed: testResults.filter(r => r.passed).length,
       total: testResults.length
     });
 
@@ -640,6 +749,7 @@ exports.runDSA = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // ──────────────────────────────────────────────────
 //  V2 — Get Session
@@ -677,6 +787,8 @@ exports.getSession = async (req, res) => {
              difficulty: currentRoundNum === 2 ? 'easy' : (currentRoundNum === 3 ? 'medium' : 'hard'),
              roundNumber: currentRoundNum
           });
+          console.log('[DSA DEBUG] title:', nextRoundQuestions?.title);
+          console.log('[DSA DEBUG] type:', Array.isArray(nextRoundQuestions) ? 'ARRAY (bad)' : 'OBJECT (good)');
        } else if (currentRoundNum === 5) {
           nextRoundQuestions = await generateHRBatch({ 
              role: session.target_role, 
@@ -684,19 +796,37 @@ exports.getSession = async (req, res) => {
           });
        }
 
-       if (nextRoundQuestions.length > 0) {
-          for (const q of nextRoundQuestions) {
+       if (nextRoundQuestions) {
+          const questionsArr = Array.isArray(nextRoundQuestions) ? nextRoundQuestions : [nextRoundQuestions];
+          for (const q of questionsArr) {
              const nextQsInsert = {
                 interview_id: session.id,
                 round_number: currentRoundNum,
-                question_type: currentRoundNum === 5 ? 'hr' : 'dsa',
-                subject: currentRoundNum === 5 ? 'HR' : 'DSA',
-                topic: q.topic || q.subject || (currentRoundNum === 5 ? 'Behavioral' : 'DSA'),
-                question_text: q.questionText || q.problemStatement || q.question_text || "",
-                test_cases: q.test_cases || q.testCases || [],
-                hints: q.hints || null,
-                solution_approach: q.solution_approach || null
+                question_type: currentRoundNum === 5 ? 'hr' : 'coding',
+                difficulty: q.difficulty || session.difficulty,
+                topic: q.topic || q.title || (currentRoundNum === 5 ? 'Behavioral' : 'DSA'),
              };
+
+             if (currentRoundNum >= 2 && currentRoundNum <= 4) {
+                Object.assign(nextQsInsert, {
+                   question_text: q.title || "Coding Challenge",
+                   slug: q.slug || q.question_slug || null,
+                   subject: 'DSA',
+                   problem_statement: q.problemStatement || q.questionText || "",
+                   function_signatures: q.functionSignatures || q.function_signature || null,
+                   examples: q.examples || null,
+                   test_cases: q.test_cases || q.testCases || null,
+                   hints: q.hints || null,
+                   constraints: q.constraints || null,
+                   time_complexity_expected: q.timeComplexityExpected || null,
+                   space_complexity_expected: q.spaceComplexityExpected || null,
+                });
+             } else {
+                Object.assign(nextQsInsert, {
+                   question_text: q.questionText || q.question_text || "",
+                   explanation: q.explanation || null,
+                });
+             }
              const { data: inserted } = await supabase.from("interview_questions").insert(nextQsInsert).select();
              if (inserted) session.interview_questions.push(...inserted);
           }
@@ -768,6 +898,41 @@ exports.getResults = async (req, res) => {
     res.json(results);
   } catch (err) {
     console.error("[V2 Get Results] Exception:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ──────────────────────────────────────────────────
+//  V2 — Delete Interview
+//  DELETE /api/interview/:id
+// ──────────────────────────────────────────────────
+exports.deleteInterview = async (req, res) => {
+  try {
+    const authData = typeof req.auth === 'function' ? req.auth() : req.auth;
+    const userId = authData?.userId;
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const cleanId = req.params.id.replace('sess_', '');
+    
+    // Deleting from 'interviews' should cascade if setup correctly.
+    // If not, we manually clean up.
+    await supabase.from("session_questions").delete().eq("session_id", cleanId);
+    await supabase.from("question_attempts").delete().eq("session_id", cleanId);
+    await supabase.from("interview_round_summaries").delete().eq("interview_id", cleanId);
+    await supabase.from("interview_responses").delete().eq("interview_id", cleanId);
+
+    const { error } = await supabase
+      .from("interviews")
+      .delete()
+      .eq("id", cleanId)
+      .eq("user_id", userId);
+
+    if (error) throw error;
+
+    res.json({ message: "Interview deleted successfully" });
+
+  } catch (err) {
+    console.error("[V2 Delete Interview]", err);
     res.status(500).json({ message: err.message });
   }
 };

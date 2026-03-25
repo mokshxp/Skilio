@@ -18,6 +18,7 @@ const useInterviewStore = create(
       currentRound: 1,
       roundStatus: 'active', // 'active' | 'submitting' | 'summary' | 'complete'
       isInterviewComplete: false,
+      totalRounds: 5,
       roundSummaries: [],
       nextRoundData: null,
       
@@ -37,7 +38,8 @@ const useInterviewStore = create(
       dsaLanguage: 'python',
       dsaTestResults: [],
       dsaAttempts: 0,
-      dsaQuestion: null,
+      dsaQuestions: [],
+      dsaCurrentIndex: 0,
       lastDSASubmission: null,
       
       // HR STATE
@@ -58,19 +60,22 @@ const useInterviewStore = create(
           session,
           currentRound: round.roundNumber,
           roundType: round.roundType,
+          totalRounds: session.total_rounds || 5,
           roundData: round, // Backwards compatibility for now
           // If the round data has questions, populate them
           mcqQuestions: (round.roundType === 'mcq' || round.roundType === 'technical') ? round.questions || [] : [],
-          dsaQuestion: (round.roundType === 'coding' || round.roundType === 'dsa') ? round.questions?.[0] || round.questions || null : null,
-          hrQuestions: (round.roundType === 'behavioural' || round.roundType === 'behavioral' || round.roundType === 'hr') ? round.questions || [] : [],
-          roundStatus: session.status === 'completed' ? 'complete' : 'active',
-          isInterviewComplete: session.status === 'completed',
-          mcqAnswers: {},
           mcqCurrentIndex: 0,
+          mcqAnswers: {},
+          dsaQuestions: (round.roundType === 'coding' || round.roundType === 'dsa') ? round.questions || [] : [],
+          dsaCurrentIndex: 0,
+          dsaCode: { python: '', javascript: '', java: '', cpp: '' },
           dsaTestResults: [],
+          hrQuestions: (round.roundType === 'behavioural' || round.roundType === 'behavioral' || round.roundType === 'hr' || round.roundType === 'text') ? round.questions || [] : [],
           hrAnswers: {},
           hrCurrentIndex: 0,
-          roundSummaries: session.round_summaries || []
+          roundStatus: session.status === 'completed' ? 'complete' : 'active',
+          isInterviewComplete: session.status === 'completed',
+          roundSummaries: session.interview_round_summaries || session.round_summaries || []
         });
       },
 
@@ -147,6 +152,7 @@ const useInterviewStore = create(
         }));
       },
 
+      setDSAIndex: (index) => set({ dsaCurrentIndex: index, dsaTestResults: [] }),
       setDSALanguage: (lang) => set({ dsaLanguage: lang }),
 
       runDSACode: async (code, language, questionId) => {
@@ -257,12 +263,14 @@ const useInterviewStore = create(
             nextRoundData: null,
             // Reset local states for the new round
             mcqQuestions: (nextRoundData.roundType === 'mcq' || nextRoundData.roundType === 'technical') ? nextRoundData.questions || [] : [],
-            dsaQuestion: (nextRoundData.roundType === 'coding' || nextRoundData.roundType === 'dsa') ? nextRoundData.questions?.[0] || nextRoundData.questions || null : null,
-            hrQuestions: (nextRoundData.roundType === 'behavioural' || nextRoundData.roundType === 'behavioral' || nextRoundData.roundType === 'hr') ? nextRoundData.questions || [] : [],
-            mcqAnswers: {},
             mcqCurrentIndex: 0,
+            mcqAnswers: {},
+            dsaQuestions: (nextRoundData.roundType === 'coding' || nextRoundData.roundType === 'dsa') ? nextRoundData.questions || [] : [],
+            dsaCurrentIndex: 0,
+            dsaCode: { python: '', javascript: '', java: '', cpp: '' },
             dsaTestResults: [],
             dsaAttempts: 0,
+            hrQuestions: (nextRoundData.roundType === 'behavioural' || nextRoundData.roundType === 'behavioral' || nextRoundData.roundType === 'hr') ? nextRoundData.questions || [] : [],
             hrAnswers: {},
             hrCurrentIndex: 0
           });

@@ -11,7 +11,7 @@ import {
 import { 
     Target, BarChart3, Trophy, Zap, 
     BookOpen, FileText, Bot, ArrowRight,
-    TrendingUp, Calendar, Layout, AlertCircle
+    TrendingUp, Calendar, Layout, AlertCircle, Trash2
 } from 'lucide-react'
 
 /* ── COMPONENTS ─────────────────────────────────────────────── */
@@ -267,7 +267,7 @@ function QuickActions({ plan, navigate }) {
     )
 }
 
-function RecentSessions({ sessions, navigate, loading }) {
+function RecentSessions({ sessions, navigate, loading, onDelete }) {
     if (loading) return (
         <div style={{ background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: '20px', padding: '24px' }}>
             <div className="h-4 w-32 bg-[var(--bg-2)] animate-pulse rounded mb-8" />
@@ -302,18 +302,23 @@ function RecentSessions({ sessions, navigate, loading }) {
                     {sessions.slice(0, 5).map(s => (
                         <div 
                             key={s.id} 
-                            onClick={() => navigate(`/results/${s.id}`)}
                             style={{ 
                                 display: 'flex', alignItems: 'center', gap: '14px', 
                                 padding: '12px 16px', background: 'var(--bg-2)', 
                                 borderRadius: '14px', border: '1px solid var(--border)',
-                                cursor: 'pointer', transition: 'all 0.15s ease'
+                                cursor: 'default', transition: 'all 0.15s ease',
+                                position: 'relative',
+                                group: 'true'
                             }}
+                            className="group"
                             onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--primary)'}
                             onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}
                         >
                             <Calendar size={18} className="text-[var(--text-2)]" />
-                            <div style={{ flex: 1 }}>
+                            <div 
+                                style={{ flex: 1, cursor: 'pointer' }}
+                                onClick={() => navigate(`/results/${s.id}`)}
+                            >
                                 <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-0)' }}>
                                     {s.role || 'Interview Session'}
                                 </div>
@@ -321,8 +326,20 @@ function RecentSessions({ sessions, navigate, loading }) {
                                     {new Date(s.created_at).toLocaleDateString()} · {s.type || 'Mixed'}
                                 </div>
                             </div>
-                            <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--primary)' }}>
-                                {s.final_score ? (s.final_score / 10).toFixed(1) : '—'}
+                            <div className="flex items-center gap-4">
+                                <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--primary)' }}>
+                                    {s.final_score ? (s.final_score / 10).toFixed(1) : '—'}
+                                </div>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (confirm('Delete this session permanently?')) onDelete(s.id);
+                                    }}
+                                    className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-rose-500/10 hover:text-rose-500 transition-all text-[var(--text-2)]"
+                                    title="Delete session"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -422,7 +439,19 @@ export default function Dashboard() {
                 {/* LEFT: Main Content */}
                 <div className="dashboard-left">
                     <ScoreChart data={analytics?.score_trend || []} loading={loading} />
-                    <RecentSessions sessions={sessions} navigate={navigate} loading={loading} />
+                    <RecentSessions 
+                        sessions={sessions} 
+                        navigate={navigate} 
+                        loading={loading} 
+                        onDelete={async (id) => {
+                            try {
+                                await interviewApi.delete(id);
+                                setSessions(sessions.filter(s => s.id !== id));
+                            } catch (err) {
+                                alert('Failed to delete session');
+                            }
+                        }}
+                    />
                 </div>
 
                 {/* RIGHT: Telemetry & Actions */}

@@ -30,58 +30,55 @@ function validateInputLength(input, label, maxLength = MAX_INPUT_LENGTH) {
 /* ───────────────────────────────────────────────
    Utility: Safe JSON extraction from text
 ─────────────────────────────────────────────── */
-function extractJSON(text) {
-  if (!text) throw new Error('AI returned empty response');
-
-  // 1. Try direct parse first (cleanest case)
-  let cleaned = text.trim();
-  try {
-    return normalizeResult(JSON.parse(cleaned));
-  } catch (e) {}
-
-  // 2. Remove markdown code blocks and try again
-  cleaned = text
-    .replace(/```json\s?/gi, '')
-    .replace(/```\s?/gi, '')
+function extractJSON(rawText) {
+  if (!rawText) throw new Error('AI returned empty response');
+  
+  // Strip markdown code blocks
+  let text = rawText
+    .replace(/```json\n?/g, '')
+    .replace(/```\n?/g, '')
     .trim();
-  try {
-    return normalizeResult(JSON.parse(cleaned));
-  } catch (e) {}
 
-  // 3. Regex-based extraction (handle conversational preamble/postamble)
-  const arrayMatch = text.match(/\[\s*\{[\s\S]*\}\s*\]/);
-  const objectMatch = text.match(/\{\s*\"[\s\S]*\}\s*/);
+  // Find first { and last } to extract JSON object or array
+  const startObj = text.indexOf('{');
+  const endObj = text.lastIndexOf('}');
+  const startArr = text.indexOf('[');
+  const endArr = text.lastIndexOf(']');
 
-  if (arrayMatch) {
-    try { return normalizeResult(JSON.parse(arrayMatch[0])); } catch(e) {}
+  let start = -1;
+  let end = -1;
+
+  // Determine if it looks more like an array or an object
+  if (startArr !== -1 && endArr !== -1 && (startObj === -1 || startArr < startObj)) {
+    start = startArr;
+    end = endArr;
+  } else if (startObj !== -1 && endObj !== -1) {
+    start = startObj;
+    end = endObj;
   }
   
-  if (objectMatch) {
-    try {
-      // Find the last closing brace to avoid greediness issues with multiple objects
-      const lastBrace = text.lastIndexOf('}');
-      const firstBrace = text.indexOf('{');
-      if (firstBrace !== -1 && lastBrace !== -1) {
-        const potentialJson = text.substring(firstBrace, lastBrace + 1);
-        return normalizeResult(JSON.parse(potentialJson));
-      }
-    } catch(e) {}
+  if (start === -1 || end === -1) {
+    throw new Error('No JSON content found in response');
   }
-
-  console.error('[AI Parse Error] Completely unparseable response:', text.substring(0, 500));
-  throw new Error('AI returned unparseable response');
+  
+  const jsonStr = text.slice(start, end + 1);
+  try {
+    return normalizeResult(JSON.parse(jsonStr));
+  } catch (e) {
+    console.error('[AI Parse Error] JSON.parse failed on extracted string:', jsonStr);
+    throw new Error('AI returned unparseable response');
+  }
 }
 
-function normalizeResult(parsed) {
-  if (!parsed) return [];
-  // Normalize to array — handle all cases AI might return
+function normalizeResult(parsed, forceArray = true) {
+  if (!parsed) return forceArray ? [] : null;
   if (Array.isArray(parsed)) return parsed;
   if (parsed && typeof parsed === 'object') {
     if (Array.isArray(parsed.questions)) return parsed.questions;
     if (Object.keys(parsed).every(k => !isNaN(Number(k)))) return Object.values(parsed);
-    return [parsed];
+    return forceArray ? [parsed] : parsed; // ← only wrap if forceArray
   }
-  return [parsed];
+  return forceArray ? [parsed] : parsed;
 }
 
 /* ───────────────────────────────────────────────
@@ -96,15 +93,18 @@ async function callNvidia({
   systemInstruction,
   userContent,
   expectJSON = true,
+  rawObject = false,
   enableThinking = false,
-  maxTokens = 4096,
+  maxTokens = 2048,
   timeoutMs = 180000,
-  temperature = 0.6,
+  temperature = 0.3,
 }) {
   const messages = [];
 
   if (systemInstruction) {
     messages.push({ role: "system", content: systemInstruction });
+  } else if (expectJSON) {
+    messages.push({ role: "system", content: "You are a JSON API. You ONLY respond with raw valid JSON. Never include markdown, code blocks, explanations, or any text outside the JSON object." });
   }
 
   messages.push({ role: "user", content: userContent });
@@ -140,7 +140,12 @@ async function callNvidia({
       responseText = responseText.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 
       if (expectJSON) {
-        return extractJSON(responseText);
+        const parsed = extractJSON(responseText);
+        // If rawObject, return as-is (for DSA problems etc.)
+        if (rawObject) {
+          return Array.isArray(parsed) ? parsed[0] : parsed;
+        }
+        return parsed;
       }
 
       return responseText;
@@ -379,7 +384,7 @@ Ensure the problem is original and high quality. Background context for tailorin
 /* ───────────────────────────────────────────────
    Career Chat (AI Copilot)
 ─────────────────────────────────────────────── */
-async function chatWithCopilot({ message, history = [], resumeContext = "" }) {
+async function chatWithCopilot({ message, history = [], resumeContext = "", interviewContext = "" }) {
   validateInputLength(message, "Chat message", 5000);
 
   const historyText = history
@@ -388,10 +393,16 @@ async function chatWithCopilot({ message, history = [], resumeContext = "" }) {
     .join("\n");
 
   const systemInstruction = `You are an AI Career Copilot for Skilio. You help candidates prepare for technical interviews, review their progress, and provide career guidance.
-${resumeContext ? `\nNote: The candidate's initially parsed resume indicates this background:\n${sanitizeInput(resumeContext, 2000)}` : ""}
-Be helpful, encouraging, and specific. Use the candidate's background as a starting point, but if the user explicitly corrects their role, target career, or skills in the conversation, you MUST immediately adapt and acknowledge the correction. Do not stubbornly force them into the resume's role. Maintain a friendly, supportive AI persona.`;
+${resumeContext ? `\n[CANDIDATE PROFILE]\n${sanitizeInput(resumeContext, 2000)}` : ""}
+${interviewContext ? `\n[TECHNICAL INTERVIEW REPORT - SESSION DATA FOUND]\n${sanitizeInput(interviewContext, 7500)}\nINSTRUCTION: The user is asking about the specific interview results provided above. Use this ground-truth data to provide a detailed post-mortem, point out mistakes, and offer technical solutions for the questions mentioned.` : ""}
 
-  const userContent = `${historyText ? `Previous conversation:\n${historyText}\n\n` : ""}User: ${sanitizeInput(message, 5000)}`;
+GENERAL GUIDELINES:
+- Be helpful, encouraging, and specific.
+- If interview data is provided above, PRIORITIZE it for explaining mistakes.
+- If the user corrections their role/skills, adapt immediately.
+- Maintain a professional yet supportive AI persona.`;
+
+  const userContent = `${historyText ? `[CONVERSATION HISTORY]\n${historyText}\n\n` : ""}[CURRENT USER QUERY]\nUser: ${sanitizeInput(message, 5000)}`;
 
   return callNvidia({
     systemInstruction,
@@ -454,6 +465,16 @@ async function generateInterviewQuestion({
   const safeDiff = sanitizeInput(difficulty, 50);
   const safeSkills = (skills || []).map(s => sanitizeInput(s, 100)).join(", ");
   const safeSummary = sanitizeInput(resumeSummary, 1000);
+
+  // V2 Coding Round Specialized Generation
+  if (roundType === 'coding' || roundType === 'dsa') {
+    return generateDSAProblemBatch({ 
+      targetRole, 
+      experienceYears, 
+      difficulty,
+      skills 
+    });
+  }
 
   const systemInstruction = `You are an expert technical interviewer at a top tech company.
 
@@ -519,6 +540,17 @@ async function generateNextInterviewQuestion({
   const safeSkills = (skills || []).map(s => sanitizeInput(s, 100)).join(", ");
   const safeSummary = sanitizeInput(resumeSummary, 1000);
   const prevTopicsList = previousQuestions.map((q, i) => `${i + 1}. ${sanitizeInput(q, 500)}`).join("\n") || "None";
+
+  // V2 Adaptive Coding Round Specialized Generation
+  if (roundType === 'coding' || roundType === 'dsa') {
+    return generateDSAProblemBatch({ 
+      targetRole, 
+      experienceYears, 
+      difficulty: safeNextDiff,
+      previousQuestions,
+      skills
+    });
+  }
 
   const systemInstruction = `You are an expert technical interviewer at a top tech company.
 
@@ -628,7 +660,9 @@ async function generateMCQBatch({ targetRole, skills = [], experienceYears = 0, 
   
   const topicsInfo = roundNumber === 1 ? round1Topics : round2Topics;
 
-  const systemInstruction = `You are a Principal Software Engineer at a Tier-1 tech company (Google/Apple/Netflix). You are conducting a "stress-test" interview for a ${safeRole}.
+  const systemInstruction = `IMPORTANT: Respond with ONLY a raw JSON array. No markdown. No explanation. No code blocks. Start your response with [ and end with ].
+
+You are a Principal Software Engineer at a Tier-1 tech company (Google/Apple/Netflix). You are conducting a "stress-test" interview for a ${safeRole}.
 
 Candidate Context:
 - Skills: ${safeSkills}  
@@ -666,14 +700,16 @@ Format:
    V2 — Generate DSA Problem (Round 3 & 4)
 ─────────────────────────────────────────────── */
 async function generateDSAProblemBatch({ targetRole, experienceYears = 0, difficulty, previousQuestions = [] }) {
-  const systemInstruction = `You are a Senior Algorithms Engineer. Generate a high-caliber "LeetCode ${sanitizeInput(difficulty, 50)}" problem for a technical interview.
+  const systemInstruction = `IMPORTANT: Respond with ONLY a raw JSON object. No markdown. No explanation. No code blocks. Start your response with { and end with }.
+
+You are a Senior Algorithms Engineer. Generate a high-caliber "LeetCode ${sanitizeInput(difficulty, 50)}" problem for a technical interview.
 
 Target Role: ${sanitizeInput(targetRole, 100)}
 Experience: ${experienceYears} years
 
 Topics to draw from: Arrays, Strings, Linked Lists, Trees, Graphs, Dynamic Programming, Sliding Window, Two Pointers, Binary Search, Stack/Queue, Heap (Priority Queue), Backtracking.
 
-Required Output Format (Raw JSON ONLY):
+Required Output Format: Return ONLY a raw JSON object. NO preamble, NO conversational text, NO markdown code blocks.
 {
   "title": "Problem Title",
   "slug": "problem-slug",
@@ -700,23 +736,31 @@ Required Output Format (Raw JSON ONLY):
 }
 
 Rules:
-1. NO explained text outside the JSON.
+1. OUTPUT ONLY THE JSON.
 2. Ensure test cases are valid and match the problem.
-3. The problem should be original or a creative variation of standard ones.`;
+3. The response must be one single valid JSON object.`;
 
   const userContent = `Generate a high-quality ${difficulty} DSA coding problem for a ${targetRole} candidate with ${experienceYears} years of experience.
   Focus on topics like ${difficulty === 'easy' ? 'Arrays, Strings, HashMaps' : (difficulty === 'medium' ? 'Trees, Graphs, Sliding Window' : 'DP, Advanced Graphs, Hard Array Manipulations')}.
   
   Ensure the response is ONLY the JSON object following the system instructions.`;
 
-  return callNvidia({ systemInstruction, userContent, temperature: 0.7 });
+  return callNvidia({ 
+    systemInstruction, 
+    userContent, 
+    temperature: 0.7, 
+    rawObject: true,
+    maxTokens: 4096 
+  });
 }
 
 /* ───────────────────────────────────────────────
    V2 — Generate HR Questions (Round 5)
 ─────────────────────────────────────────────── */
 async function generateHRBatch({ targetRole, experienceYears = 0, previousQuestions = [] }) {
-  const systemInstruction = `You are a Lead Talent Partner. Generate exactly 5 premium behavioral interview questions for a ${sanitizeInput(targetRole, 100)} position.
+  const systemInstruction = `IMPORTANT: Respond with ONLY a raw JSON array. No markdown. No explanation. No code blocks. Start your response with [ and end with ].
+
+You are a Lead Talent Partner. Generate exactly 5 premium behavioral interview questions for a ${sanitizeInput(targetRole, 100)} position.
 
 Candidate Level: ${experienceYears} years experience.
 Strategy: Use competency-based behavioral questioning.

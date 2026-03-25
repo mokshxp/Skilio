@@ -12,5 +12,7 @@ router.post("/dsa/run", authMiddleware, interviewController.runDSA);
 router.get("/", authMiddleware, interviewSchemas.listSessions, interviewController.listInterviews);
 router.get("/:id/results", authMiddleware, interviewController.getResults);
 router.get("/session/:id", authMiddleware, interviewController.getSession);
+router.get("/:id", authMiddleware, interviewController.getSession);
+router.delete("/:id", authMiddleware, interviewController.deleteInterview);
 
 module.exports = router;

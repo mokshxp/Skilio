@@ -14,6 +14,67 @@ async function getResumeContext(userId) {
     return `${data.primary_role || ''}, ${data.experience_years || 0} yrs exp. Skills: ${(data.skills || []).join(", ")}. ${data.summary || ''}`;
 }
 
+// Get detailed interview context for context injection
+async function getInterviewContext(userId, interviewId) {
+    if (!interviewId) return "";
+    try {
+        console.log(`[Chat Context] Fetching interview ${interviewId} for user ${userId}`);
+        const { data: interview, error } = await supabase
+            .from("interviews")
+            .select("*, interview_questions(*), interview_responses(*), interview_round_summaries(*)")
+            .eq("id", interviewId)
+            .eq("user_id", userId)
+            .single();
+
+        if (error || !interview) {
+            console.warn(`[Chat Context] No data found for interviewId: ${interviewId}`);
+            return "";
+        }
+
+        let context = `\n--- START SPECIFIC INTERVIEW DATA (ID: ${interviewId}) ---\n`;
+        context += `Session Role: ${interview.target_role}, Overall Status: ${interview.status}, Type: ${interview.type}\n`;
+        context += `Final Score/PPS: ${interview.pps_score || interview.score || 'N/A'}\n\n`;
+
+        if (interview.interview_round_summaries && interview.interview_round_summaries.length > 0) {
+            context += "PERFORMANCE BY ROUND:\n";
+            interview.interview_round_summaries.sort((a,b) => a.round_number - b.round_number).forEach(s => {
+                context += `- Round ${s.round_number} (${s.round_type}): Grade: ${s.score}/10. Summary: ${s.ai_summary || ''}\n`;
+            });
+            context += "\n";
+        }
+
+        if (interview.interview_questions && interview.interview_questions.length > 0) {
+            context += "DETAILED Q&A LOG:\n";
+            // Map responses for easy lookup
+            const responseMap = (interview.interview_responses || []).reduce((acc, r) => {
+                acc[r.question_id] = r;
+                return acc;
+            }, {});
+
+            interview.interview_questions.forEach((q, i) => {
+                const resp = responseMap[q.id];
+                context += `[${q.round_number}] Q: ${q.question_text}\n`;
+                if (q.question_type === 'mcq') {
+                    context += `   Choice A: ${q.options?.A || 'N/A'}\n   Choice B: ${q.options?.B || 'N/A'}\n   Choice C: ${q.options?.C || 'N/A'}\n   Choice D: ${q.options?.D || 'N/A'}\n`;
+                    context += `   Correct: ${q.correct_answer}\n`;
+                }
+                context += `   User Provided: ${resp?.user_answer || resp?.selected_option || 'No Response'}\n`;
+                if (resp) {
+                    context += `   Evaluation: ${resp.is_correct ? 'CORRECT' : 'INCORRECT'}, Score: ${(resp.score || 0) * 10}/10\n`;
+                    context += `   AI Feedback: ${resp.ai_feedback || 'N/A'}\n`;
+                }
+                context += "---\n";
+            });
+        }
+        context += `--- END SPECIFIC INTERVIEW DATA ---\n`;
+        return context;
+    } catch (err) {
+        console.error("getInterviewContext err", err);
+        return "";
+    }
+}
+
+
 exports.getSessions = async (req, res) => {
     try {
         const { userId } = typeof req.auth === 'function' ? req.auth() : req.auth;
@@ -115,6 +176,29 @@ exports.sendMessage = async (req, res) => {
         const mappedHistory = (history || []).map(m => ({ role: m.role, content: m.message })).reverse();
         const resumeContext = await getResumeContext(userId);
 
+        // EXTRACTION: Detect Interview IDs in current message or recent history
+        const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+        let match = message.match(uuidRegex);
+        
+        // Context persistence: check last 2 user messages if first one fails
+        if (!match && mappedHistory.length > 0) {
+            for (let i = mappedHistory.length - 1; i >= Math.max(0, mappedHistory.length - 3); i--) {
+                if (mappedHistory[i].role === 'user') {
+                    const hMatch = mappedHistory[i].content.match(uuidRegex);
+                    if (hMatch) {
+                        match = hMatch;
+                        break;
+                    }
+                }
+            }
+        }
+
+        let interviewContext = "";
+        if (match && match[0]) {
+            const interviewId = match[0].trim();
+            interviewContext = await getInterviewContext(userId, interviewId);
+        }
+
         const { error: userErr } = await supabase.from("chatbot_messages").insert({
             user_id: sessionUserId, role: "user", message: message,
         });
@@ -124,6 +208,7 @@ exports.sendMessage = async (req, res) => {
             message,
             history: mappedHistory,
             resumeContext,
+            interviewContext, // Full technical drill-down
         });
 
         const { error: aiErr } = await supabase.from("chatbot_messages").insert({
@@ -211,7 +296,15 @@ exports.quickAction = async (req, res) => {
             .limit(10);
         const mappedHistory = (history || []).map(m => ({ role: m.role, content: m.message })).reverse();
 
-        const response = await chatWithCopilot({ message, history: mappedHistory, resumeContext });
+        // Check for interview ID in the prompt
+        const uuidRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+        const match = message.match(uuidRegex);
+        let interviewContext = "";
+        if (match) {
+            interviewContext = await getInterviewContext(userId, match[0]);
+        }
+
+        const response = await chatWithCopilot({ message, history: mappedHistory, resumeContext, interviewContext });
 
         await supabase.from("chatbot_messages").insert([
             { user_id: sessionUserId, role: "user", message: message },
