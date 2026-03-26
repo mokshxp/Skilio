@@ -62,6 +62,23 @@ function sanitizeQuestion(aiQuestion, roundNumber, defaultDifficulty = 'intermed
   };
 }
 
+/**
+ * evalFollowUp: Instant AI evaluation of a behavioral answer to decide on follow-ups.
+ * POST /api/interview/follow-up
+ */
+exports.evalFollowUp = async (req, res) => {
+  try {
+    const { question, answer, role, difficulty } = req.body;
+    const { generateFollowUp } = require("../services/ai");
+
+    const result = await generateFollowUp({ question, answer, role, difficulty });
+    
+    res.json({ success: true, ...result });
+  } catch (err) {
+    console.error("[evalFollowUp Controller Error]", err);
+    res.json({ success: false, needsFollowUp: false, error: err.message });
+  }
+};
 // ── Main Start Interview Controller ──────────────────────────
 exports.startInterview = async (req, res) => {
   const log = (step, data) => {
@@ -104,15 +121,18 @@ exports.startInterview = async (req, res) => {
 
     // FIX A: Handle alias fields (role/targetRole, round/roundType)
     const targetRole = (body.role || body.targetRole || 'Software Engineer').trim();
-    // roundType already declared above for subscription check
     const difficulty = (body.difficulty || 'intermediate').toLowerCase().trim();
-    const totalRounds = Number(body.totalRounds || body.total_rounds) || 5;
     const resumeId = sanitizeUUID(body.resumeId);
 
-    log('3. Sanitized values', { resumeId, difficulty, roundType, targetRole, totalRounds });
+    const { ROUND_SEQUENCES } = require('../config/roundConfig');
+    const sequence = ROUND_SEQUENCES[roundType] || ROUND_SEQUENCES['mixed'];
+    const totalRounds = sequence.length;
+    const firstRound = sequence[0];
+
+    log('3. Sanitized values', { resumeId, difficulty, roundType, targetRole, totalRounds, firstRoundType: firstRound.type });
 
     const validDifficulties = ['beginner', 'intermediate', 'advanced', 'expert'];
-    const validRoundTypes = ['technical', 'coding', 'behavioural', 'mixed'];
+    const validRoundTypes = Object.keys(ROUND_SEQUENCES);
 
     if (!validDifficulties.includes(difficulty)) {
       log('4. VALIDATION FAILED (difficulty)', difficulty);
@@ -181,17 +201,31 @@ exports.startInterview = async (req, res) => {
     log('6. Interview created', { id: interview.id });
 
     // 7. Generate questions via AI
-    log('7. Generating questions via AI...');
+    log('7. Generating questions via AI...', { firstRoundType: firstRound.type });
     let questions;
     try {
-      questions = await generateMCQBatch({
-        targetRole,
-        skills: resumeData?.skills || [],
-        experienceYears: resumeData?.experience_years || 0,
-        difficulty,
-        roundNumber: 1
-      });
-      log('7. AI questions generated', { count: questions?.length });
+      if (firstRound.type === 'mcq' || firstRound.type === 'technical') {
+        questions = await generateMCQBatch({
+          targetRole,
+          skills: resumeData?.skills || [],
+          experienceYears: resumeData?.experience_years || 0,
+          difficulty: firstRound.difficulty || difficulty,
+          roundNumber: 1
+        });
+      } else if (firstRound.type === 'dsa' || firstRound.type === 'coding') {
+        questions = await generateDSAProblemBatch({
+          targetRole,
+          difficulty: firstRound.difficulty || difficulty,
+          roundNumber: 1
+        });
+      } else if (firstRound.type === 'hr' || firstRound.type === 'behavioral' || firstRound.type === 'behavioural') {
+        questions = await generateHRBatch({
+          targetRole,
+          experienceYears: resumeData?.experience_years || 0
+        });
+      }
+
+      log('7. AI questions generated', { count: Array.isArray(questions) ? questions.length : '1 (object)' });
     } catch (aiError) {
       log('7. AI GENERATION FAILED', aiError.message);
       await supabase.from("interviews").delete().eq("id", interview.id);
@@ -214,7 +248,7 @@ exports.startInterview = async (req, res) => {
     // 9. Save questions with fallbacks
     log('9. Saving questions to DB...');
     const questionsToInsert = questions.map(q => ({
-      ...sanitizeQuestion(q, 1, difficulty),
+      ...sanitizeQuestion(q, 1, firstRound.difficulty || difficulty),
       interview_id: interview.id
     }));
 
@@ -350,13 +384,18 @@ exports.completeRound = async (req, res) => {
     const totalCount = responsesToInsert.length || 1;
     const score = (correctCount / totalCount) * 10;
 
+    const { ROUND_SEQUENCES } = require('../config/roundConfig');
+    const trackSequence = ROUND_SEQUENCES[interview.round_type] || ROUND_SEQUENCES['mixed'];
+    const currentRoundStep = trackSequence.find(r => r.round === roundNumber);
+    const nextRoundStep = trackSequence.find(r => r.round === roundNumber + 1);
+
     // 5. Create Round Summary
     const { data: summary } = await supabase
       .from("interview_round_summaries")
       .insert({
         interview_id: interviewId,
         round_number: roundNumber,
-        round_type: roundNumber === 1 ? 'mcq' : (roundNumber <= 4 ? 'dsa' : 'hr'),
+        round_type: currentRoundStep?.type || 'mcq',
         score: score,
         correct_count: correctCount,
         total_count: totalCount,
@@ -375,22 +414,29 @@ exports.completeRound = async (req, res) => {
     const nextRoundNumber = roundNumber + 1;
     let nextRoundQuestions = [];
     let savedNextQs = [];
-    let nextRoundType = '';
+    let nextRoundType = nextRoundStep?.type || '';
 
-    if (nextRoundNumber === 2 || nextRoundNumber === 3 || nextRoundNumber === 4) {
+    if (nextRoundType === 'dsa' || nextRoundType === 'coding') {
       nextRoundType = 'dsa';
       nextRoundQuestions = await generateDSAProblemBatch({
         targetRole: interview.target_role,
-        difficulty: nextRoundNumber === 2 ? 'easy' : (nextRoundNumber === 3 ? 'medium' : 'hard'),
+        difficulty: nextRoundStep?.difficulty || 'medium',
         roundNumber: nextRoundNumber
       });
       console.log('[DSA DEBUG] title:', nextRoundQuestions?.title);
       console.log('[DSA DEBUG] type:', Array.isArray(nextRoundQuestions) ? 'ARRAY (bad)' : 'OBJECT (good)');
-    } else if (nextRoundNumber === 5) {
+    } else if (nextRoundType === 'hr' || nextRoundType === 'behavioral') {
       nextRoundType = 'hr';
       nextRoundQuestions = await generateHRBatch({
         targetRole: interview.target_role,
         experienceYears: interview.resume_context?.experience || 0
+      });
+    } else if (nextRoundType === 'mcq' || nextRoundType === 'technical') {
+      nextRoundType = 'mcq';
+      nextRoundQuestions = await generateMCQBatch({
+        targetRole: interview.target_role,
+        difficulty: nextRoundStep?.difficulty || 'medium',
+        roundNumber: nextRoundNumber
       });
     }
 
@@ -406,7 +452,7 @@ exports.completeRound = async (req, res) => {
             title: q.title || q.topic || "Coding Challenge",
             slug: slug,
             topic: q.topic || "Algorithms",
-            difficulty: nextRoundNumber === 2 ? 'easy' : (nextRoundNumber === 3 ? 'medium' : 'hard'),
+            difficulty: nextRoundStep?.difficulty || 'medium',
             base_description: q.problemStatement || q.questionText || q.question_text || "",
             constraints: Array.isArray(q.constraints) ? q.constraints : [q.constraints],
             created_at: new Date()
@@ -781,20 +827,26 @@ exports.getSession = async (req, res) => {
        console.log(`🛠️ [Self-Heal] Missing questions for Round ${currentRoundNum}. Generating...`);
        
        let nextRoundQuestions = [];
+       const resumeData = session.resume_context || {};
+       
        if (currentRoundNum >= 2 && currentRoundNum <= 4) {
           nextRoundQuestions = await generateDSAProblemBatch({
              targetRole: session.target_role,
              difficulty: currentRoundNum === 2 ? 'easy' : (currentRoundNum === 3 ? 'medium' : 'hard'),
-             roundNumber: currentRoundNum
+             roundNumber: currentRoundNum,
+             skills: resumeData.skills || [],
+             experienceYears: resumeData.experience_years || 0
           });
           console.log('[DSA DEBUG] title:', nextRoundQuestions?.title);
-          console.log('[DSA DEBUG] type:', Array.isArray(nextRoundQuestions) ? 'ARRAY (bad)' : 'OBJECT (good)');
        } else if (currentRoundNum === 5) {
           nextRoundQuestions = await generateHRBatch({ 
-             role: session.target_role, 
-             difficulty: session.difficulty || 'intermediate' 
+             targetRole: session.target_role, 
+             difficulty: session.difficulty || 'intermediate',
+             skills: resumeData.skills || [],
+             experienceYears: resumeData.experience_years || 0
           });
        }
+
 
        if (nextRoundQuestions) {
           const questionsArr = Array.isArray(nextRoundQuestions) ? nextRoundQuestions : [nextRoundQuestions];
@@ -912,12 +964,31 @@ exports.deleteInterview = async (req, res) => {
     const userId = authData?.userId;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const cleanId = req.params.id.replace('sess_', '');
+    const rawId = req.params.id || '';
+    const cleanId = rawId.toString().replace('sess_', '');
     
-    console.log(`[DeleteInterview] Starting cleanup for session ${cleanId} (User: ${userId})`);
+    console.log(`[DeleteInterview] Root request for ${cleanId} (User: ${userId})`);
 
-    // 1. Clean up all related tables to avoid FK violations and stale data
-    // Some use 'interview_id', others use 'session_id'
+    // 1. Diagnostics: Check where this ID exists before deletion
+    const [{ data: intExists }, { data: sessExists }] = await Promise.all([
+      supabase.from("interviews").select("id").eq("id", cleanId).eq("user_id", userId).maybeSingle(),
+      supabase.from("interview_sessions").select("id").eq("id", cleanId).eq("user_id", userId).maybeSingle()
+    ]);
+
+    if (!intExists && !sessExists) {
+        console.warn(`[DeleteInterview] ID ${cleanId} NOT FOUND in either interviews or interview_sessions for this user.`);
+        return res.status(404).json({ error: "Session not found or already deleted" });
+    }
+
+    console.log(`[DeleteInterview] Target found. Deletion proceeding... (interviews: ${!!intExists}, sessions: ${!!sessExists})`);
+
+    // 2. Cascade Cleanup (Manual)
+    const { data: answers } = await supabase.from("user_answers").select("id").eq("interview_id", cleanId);
+    if (answers?.length > 0) {
+      const answerIds = answers.map(a => a.id);
+      await supabase.from("execution_logs").delete().in("answer_id", answerIds);
+    }
+
     const cleanupOperations = [
       supabase.from("session_questions").delete().eq("session_id", cleanId),
       supabase.from("question_attempts").delete().eq("session_id", cleanId),
@@ -928,33 +999,35 @@ exports.deleteInterview = async (req, res) => {
       supabase.from("coding_problems").delete().eq("interview_id", cleanId),
       supabase.from("questions").delete().eq("interview_id", cleanId),
       supabase.from("user_answers").delete().eq("interview_id", cleanId),
-      supabase.from("interview_sessions").delete().eq("id", cleanId).eq("user_id", userId),
     ];
 
-    const results = await Promise.allSettled(cleanupOperations);
-    results.forEach((res, i) => {
-       if (res.status === 'rejected') {
-          console.warn(`[DeleteInterview] Step ${i} failed:`, res.reason);
-       }
-    });
+    await Promise.allSettled(cleanupOperations);
 
-    // 2. Finally delete the main interview record
-    const { error: deleteError } = await supabase
+    // 3. Purge main records
+    await supabase.from("interview_sessions").delete().eq("id", cleanId).eq("user_id", userId);
+    
+    const { error: mainDeleteError } = await supabase
       .from("interviews")
       .delete()
       .eq("id", cleanId)
       .eq("user_id", userId);
 
-    if (deleteError) {
-       console.error("[DeleteInterview] Main delete failed:", deleteError);
-       throw deleteError;
+    if (mainDeleteError) {
+       console.error("[DeleteInterview] CRITICAL: Root delete failed:", mainDeleteError);
+       return res.status(400).json({ 
+         error: "Database restricted delete", 
+         message: "Could not delete root session entry. Other records might still be referencing it.",
+         details: mainDeleteError.message 
+       });
     }
 
-    console.log(`[DeleteInterview] Successfully deleted session ${cleanId}`);
-    res.json({ message: "Interview deleted successfully" });
+    console.log(`[DeleteInterview] Successfully purged session ${cleanId}.`);
+    res.json({ success: true, message: "Interview and all related data deleted successfully" });
 
   } catch (err) {
-    console.error("[V2 Delete Interview] Exception:", err);
+    console.error("[V2 Delete Interview] Exception during purge:", err);
     res.status(500).json({ message: err.message });
   }
 };
+
+

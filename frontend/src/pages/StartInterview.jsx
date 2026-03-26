@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { FileText, ChevronDown, ChevronUp, Upload, Loader2, Play, Lock, Zap } from 'lucide-react'
 import { interviewApi, resumeApi } from '../services/api.js'
 import { useSubscription } from '../hooks/useSubscription.js'
+import { useInterviewSession } from '../hooks/useInterviewSession.js'
 
 const ROLES = ['Frontend Engineer', 'Backend Engineer', 'Full Stack', 'Data Scientist', 'ML Engineer', 'DevOps', 'System Design', 'Product Manager']
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced', 'Expert']
@@ -27,7 +28,8 @@ export default function StartInterview() {
     const navigate = useNavigate()
     const location = useLocation()
     const { canStartInterview, isFree, usage, isLoading: subLoading } = useSubscription()
-    const [role, setRole] = useState('Frontend Engineer')
+    const { setSessionConfig } = useInterviewSession()
+    const [role, setRole] = useState('')
     const [difficulty, setDifficulty] = useState('Intermediate')
     const [round, setRound] = useState('technical')
     const [resumeId, setResumeId] = useState(null)
@@ -62,7 +64,9 @@ export default function StartInterview() {
                     setSelectedResume(res)
                     setResumeId(res.id)
                     if (res.primary_role && !location.state?.role) {
-                        setRole(res.primary_role)
+                        // We no longer auto-set the state, we keep it empty to show placeholder in preview
+                        // or we can set a separate placeholder state if we want to be fancy.
+                        // For now, keeping role state empty and using res.primary_role as fallback in UI.
                     }
                 }
             } catch (err) {
@@ -88,9 +92,7 @@ export default function StartInterview() {
             const fullResume = await resumeApi.get(resume.id)
             setSelectedResume(fullResume)
             setResumeId(fullResume.id)
-            if (fullResume.primary_role) {
-                setRole(fullResume.primary_role)
-            }
+            setResumeId(fullResume.id)
             setShowResumeSelector(false)
         } catch (err) {
             console.error('Failed to select resume', err)
@@ -122,8 +124,9 @@ export default function StartInterview() {
         setError(null)
         
         try {
+            const finalRole = role || (selectedResume?.primary_role) || 'Frontend Engineer';
             const payload = {
-                role: role.trim(),
+                role: finalRole.trim(),
                 difficulty: difficulty.toLowerCase().trim(),
                 roundType: round.toLowerCase().trim(),
                 resumeId: (selectedResume?.id) || null,
@@ -133,6 +136,18 @@ export default function StartInterview() {
             console.log('[Frontend] Starting interview with payload:', payload)
             
             const res = await interviewApi.create(payload)
+            
+            // Sync session configuration with global state
+            setSessionConfig({
+                role: finalRole.trim(),
+                difficulty: difficulty.trim(),
+                roundType: round.trim(),
+                resumeContext: selectedResume ? {
+                    summary: selectedResume.summary || "",
+                    skills: selectedResume.skills || []
+                } : null
+            })
+            
             navigate(`/interview/${res.interviewId}`)
         } catch (e) {
             console.error('[Frontend] Start failed:', e)
@@ -472,7 +487,7 @@ export default function StartInterview() {
 
                         <div style={{ padding: '20px' }}>
                             <SummaryRow label="Resume" value={selectedResume ? (selectedResume.primary_role || 'Uploaded') : 'None'} highlight={!!selectedResume} />
-                            <SummaryRow label="Role" value={role} />
+                            <SummaryRow label="Role" value={role || (selectedResume?.primary_role) || 'Select Role...'} highlight={!!role} />
                             <SummaryRow label="Difficulty" value={difficulty} />
                             <SummaryRow label="Round" value={selectedRound?.label} last />
                         </div>

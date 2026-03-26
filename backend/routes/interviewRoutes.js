@@ -14,5 +14,6 @@ router.get("/:id/results", authMiddleware, interviewController.getResults);
 router.get("/session/:id", authMiddleware, interviewController.getSession);
 router.get("/:id", authMiddleware, interviewController.getSession);
 router.delete("/:id", authMiddleware, interviewController.deleteInterview);
+router.post("/follow-up", authMiddleware, interviewController.evalFollowUp);
 
 module.exports = router;

@@ -448,8 +448,10 @@ export default function Dashboard() {
                                 await interviewApi.delete(id);
                                 setSessions(sessions.filter(s => s.id !== id));
                             } catch (err) {
-                                alert('Failed to delete session');
+                                console.error('[Dashboard] Delete failed:', err);
+                                alert(`Failed to delete session: ${err.message}`);
                             }
+
                         }}
                     />
                 </div>
