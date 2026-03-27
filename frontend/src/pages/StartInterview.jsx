@@ -5,6 +5,7 @@ import { FileText, ChevronDown, ChevronUp, Upload, Loader2, Play, Lock, Zap } fr
 import { interviewApi, resumeApi } from '../services/api.js'
 import { useSubscription } from '../hooks/useSubscription.js'
 import { useInterviewSession } from '../hooks/useInterviewSession.js'
+import { getSequence } from '../config/roundConfig.js'
 
 const ROLES = ['Frontend Engineer', 'Backend Engineer', 'Full Stack', 'Data Scientist', 'ML Engineer', 'DevOps', 'System Design', 'Product Manager']
 const DIFFICULTIES = ['Beginner', 'Intermediate', 'Advanced', 'Expert']
@@ -490,6 +491,37 @@ export default function StartInterview() {
                             <SummaryRow label="Role" value={role || (selectedResume?.primary_role) || 'Select Role...'} highlight={!!role} />
                             <SummaryRow label="Difficulty" value={difficulty} />
                             <SummaryRow label="Round" value={selectedRound?.label} last />
+                        </div>
+
+                        {/* Interactive Round List Preview */}
+                        <div style={{ padding: '0 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 10, color: 'var(--text-3)', letterSpacing: '0.05em', textTransform: 'uppercase', marginBottom: 4 }}>
+                                Track Overview
+                            </p>
+                            {getSequence(round, role).map((step, idx) => (
+                                <motion.div
+                                    key={idx}
+                                    initial={{ opacity: 0, x: 10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: idx * 0.05 }}
+                                    style={{
+                                        display: 'flex', alignItems: 'center', gap: 12,
+                                        padding: '8px 12px', background: 'var(--bg-2)',
+                                        borderRadius: 8, border: '1px solid var(--border-md)',
+                                    }}
+                                >
+                                    <span style={{ fontSize: 16 }}>{step.icon}</span>
+                                    <div style={{ flex: 1 }}>
+                                        <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 13, fontWeight: 600, color: 'var(--text-0)', margin: 0 }}>
+                                            {step.label}
+                                        </p>
+                                        <p style={{ fontFamily: 'Manrope, sans-serif', fontSize: 10, color: 'var(--text-2)', margin: 0 }}>
+                                            Round {step.round} · {step.type.toUpperCase()}
+                                        </p>
+                                    </div>
+                                    <div style={{ width: 14, height: 14, borderRadius: '50%', border: '1.5px solid var(--border)', opacity: idx === 0 ? 1 : 0.3 }} />
+                                </motion.div>
+                            ))}
                         </div>
 
                         <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)', background: 'var(--bg-1)' }}>

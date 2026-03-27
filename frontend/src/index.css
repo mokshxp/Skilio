@@ -45,7 +45,6 @@
 
     --rose: #FB7185;
     --rose-glow: rgba(251, 113, 133, 0.18);
-
 }
 
 
@@ -133,9 +132,6 @@
     --accent-dim: rgba(0, 212, 255, 0.08);
     --accent-glow: rgba(0, 212, 255, 0.18);
     --accent-soft: #4de5ff;
-    --amber: var(--accent);
-    --amber-soft: var(--accent-soft);
-    --amber-glow: var(--accent-glow);
     --amber-dim: var(--accent-dim);
 
     --emerald: #00ff88;

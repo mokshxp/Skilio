@@ -44,22 +44,43 @@ function sanitizeUUID(value) {
 }
 
 // ── Helper: Sanitize Question with fallbacks ────────────────────
-function sanitizeQuestion(aiQuestion, roundNumber, defaultDifficulty = 'intermediate') {
-  return {
+function sanitizeQuestion(aiQuestion, roundNumber, defaultDifficulty = 'intermediate', forceType = null) {
+  const questionType = forceType || aiQuestion.round_type || aiQuestion.question_type || 'mcq';
+  const isCoding = questionType === 'coding' || questionType === 'dsa';
+
+  const base = {
     interview_id: aiQuestion.interview_id,
     round_number: roundNumber,
-    question_type: aiQuestion.round_type || aiQuestion.question_type || 'mcq',
-    question_text: aiQuestion.questionText 
+    // forceType wins (ensures coding track never saves as 'mcq')
+    question_type: questionType,
+    question_text: aiQuestion.title
+      || aiQuestion.questionText 
       || aiQuestion.question_text 
       || aiQuestion.question 
-      || 'Question text missing',
-    subject: aiQuestion.subject || aiQuestion.topic || 'CS',
+      || aiQuestion.topic
+      || 'Coding Challenge',
+    subject: aiQuestion.subject || (isCoding ? 'DSA' : aiQuestion.topic || 'CS'),
     topic: aiQuestion.topic || aiQuestion.subject || 'General',
     difficulty: (aiQuestion.difficulty || defaultDifficulty).toLowerCase().trim(),
     options: aiQuestion.options || {},
-    correct_answer: aiQuestion.correctAnswer || aiQuestion.correct_answer || 'A',
+    correct_answer: aiQuestion.correctAnswer || aiQuestion.correct_answer || (isCoding ? null : 'A'),
     explanation: aiQuestion.explanation || aiQuestion.explanation_text || ''
   };
+
+  // Save DSA-specific fields when relevant
+  if (isCoding) {
+    base.problem_statement = aiQuestion.problemStatement || aiQuestion.problem_statement || aiQuestion.description || '';
+    base.function_signatures = aiQuestion.functionSignatures || aiQuestion.function_signatures || aiQuestion.starter_code || null;
+    base.examples = aiQuestion.examples || null;
+    base.test_cases = aiQuestion.test_cases || aiQuestion.testCases || null;
+    base.hints = aiQuestion.hints || null;
+    base.constraints = aiQuestion.constraints || null;
+    base.slug = aiQuestion.slug || aiQuestion.question_slug || null;
+    base.time_complexity_expected = aiQuestion.timeComplexityExpected || aiQuestion.time_complexity_expected || null;
+    base.space_complexity_expected = aiQuestion.spaceComplexityExpected || aiQuestion.space_complexity_expected || null;
+  }
+
+  return base;
 }
 
 /**
@@ -124,15 +145,15 @@ exports.startInterview = async (req, res) => {
     const difficulty = (body.difficulty || 'intermediate').toLowerCase().trim();
     const resumeId = sanitizeUUID(body.resumeId);
 
-    const { ROUND_SEQUENCES } = require('../config/roundConfig');
-    const sequence = ROUND_SEQUENCES[roundType] || ROUND_SEQUENCES['mixed'];
+    const { getSequence, ROUND_SEQUENCES } = require('../config/roundConfig');
+    const sequence = getSequence(roundType, targetRole);
     const totalRounds = sequence.length;
     const firstRound = sequence[0];
 
     log('3. Sanitized values', { resumeId, difficulty, roundType, targetRole, totalRounds, firstRoundType: firstRound.type });
 
     const validDifficulties = ['beginner', 'intermediate', 'advanced', 'expert'];
-    const validRoundTypes = Object.keys(ROUND_SEQUENCES);
+    const validRoundTypes = ['technical', 'coding', 'behavioural', 'mixed'];
 
     if (!validDifficulties.includes(difficulty)) {
       log('4. VALIDATION FAILED (difficulty)', difficulty);
@@ -247,8 +268,11 @@ exports.startInterview = async (req, res) => {
 
     // 9. Save questions with fallbacks
     log('9. Saving questions to DB...');
+    // Map the firstRound.type to the saved question_type
+    const questionTypeMap = { dsa: 'coding', coding: 'coding', mcq: 'mcq', technical: 'mcq', hr: 'hr', behavioral: 'hr', behavioural: 'hr' };
+    const forcedType = questionTypeMap[firstRound.type] || null;
     const questionsToInsert = questions.map(q => ({
-      ...sanitizeQuestion(q, 1, firstRound.difficulty || difficulty),
+      ...sanitizeQuestion(q, 1, firstRound.difficulty || difficulty, forcedType),
       interview_id: interview.id
     }));
 
@@ -384,8 +408,8 @@ exports.completeRound = async (req, res) => {
     const totalCount = responsesToInsert.length || 1;
     const score = (correctCount / totalCount) * 10;
 
-    const { ROUND_SEQUENCES } = require('../config/roundConfig');
-    const trackSequence = ROUND_SEQUENCES[interview.round_type] || ROUND_SEQUENCES['mixed'];
+    const { getSequence } = require('../config/roundConfig');
+    const trackSequence = getSequence(interview.round_type, interview.target_role);
     const currentRoundStep = trackSequence.find(r => r.round === roundNumber);
     const nextRoundStep = trackSequence.find(r => r.round === roundNumber + 1);
 
@@ -612,7 +636,74 @@ const wrapCodeWithHarness = (code, language, input) => {
     return `${code}\n\n# --- SMART DRIVER ---\nimport json\nimport types\ntry:\n    # Discovery: Find the first function defined in the user's code scope\n    func = globals().get('solve') or globals().get('solution')\n    if not func:\n        candidate_funcs = [v for k, v in globals().items() if isinstance(v, types.FunctionType) and k not in ['json', 'sys', 'types']]\n        if candidate_funcs: func = candidate_funcs[-1]\n\n    if func:\n        result = func(*json.loads('[${cleanInput}]'))\n        print(json.dumps(result))\n    else:\n        pass\nexcept Exception as e:\n    import sys\n    sys.stderr.write(str(e))\n    sys.exit(1)`;
   }
   if (language === 'javascript' || language === 'js') {
-    return `${code}\n\n// --- SMART DRIVER ---\ntry {\n    let fn = (typeof solve === 'function') ? solve : (typeof solution === 'function' ? solution : null);\n    if (!fn) {\n        const keys = Object.keys(global).filter(k => typeof global[k] === 'function' && !['setTimeout', 'setInterval', 'console'].includes(k));\n        if (keys.length > 0) fn = global[keys[keys.length-1]];\n    }\n    if (fn) {\n        const result = fn(...JSON.parse('[${cleanInput}]'));\n        console.log(result !== undefined ? JSON.stringify(result) : "INTERNAL_NULL_RETURN");\n    }\n} catch (e) {\n    console.error(e.message);\n    process.exit(1);\n}`;
+    // Detect class at HARNESS BUILD TIME (Node.js side) to avoid runtime template issues
+    const classMatch = code.match(/\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\s*[{(]/);
+    const hasClass = !!classMatch;
+    const className = classMatch ? classMatch[1] : '';
+
+    return `${code}
+
+// --- SMART DRIVER ---
+try {
+    const _input = JSON.parse('[${cleanInput}]');
+    const _hasClass = ${hasClass};
+    const _className = ${JSON.stringify(className)};
+    const _classMatch = _hasClass ? [null, _className] : null;
+    
+    if (_classMatch) {
+        // CLASS-BASED PROBLEM (e.g. APICache, LRUCache, etc.)
+        const _ClassName = eval(_classMatch[1]);
+        const _instance = new _ClassName();
+
+        // If input is an array-of-arrays (list of method calls / requests)
+        // e.g. [['GET', 'users', 1], ['POST', 'users', {name:'John'}]]
+        if (Array.isArray(_input[0]) && Array.isArray(_input[0][0])) {
+            const _calls = _input[0];
+            const _results = _calls.map(call => {
+                // Try calling a generic handler: process(method, endpoint, params)
+                if (typeof _instance.process === 'function') {
+                    return _instance.process(...call);
+                }
+                // Fallback: try calling the class method that matches first arg
+                const _methodName = String(call[0]).toLowerCase();
+                if (typeof _instance[_methodName] === 'function') {
+                    return _instance[_methodName](...call.slice(1));
+                }
+                return null;
+            });
+            console.log(JSON.stringify(_results));
+        } else {
+            // Single call: just call process or the first method we find
+            const _args = _input;
+            let _result;
+            if (typeof _instance.process === 'function') {
+                _result = _instance.process(..._args);
+            } else {
+                const _methods = Object.getOwnPropertyNames(Object.getPrototypeOf(_instance))
+                    .filter(m => m !== 'constructor' && typeof _instance[m] === 'function');
+                if (_methods.length > 0) _result = _instance[_methods[0]](..._args);
+            }
+            console.log(_result !== undefined ? JSON.stringify(_result) : "INTERNAL_NULL_RETURN");
+        }
+    } else {
+        // FUNCTION-BASED PROBLEM
+        let fn = (typeof solve === 'function') ? solve : (typeof solution === 'function' ? solution : null);
+        if (!fn) {
+            const keys = Object.keys(global).filter(k =>
+                typeof global[k] === 'function' &&
+                !['setTimeout', 'setInterval', 'clearTimeout', 'clearInterval', 'console', 'Buffer', 'URL', 'URLSearchParams', 'TextEncoder', 'TextDecoder', 'Promise', 'JSON', 'Math', 'parseInt', 'parseFloat', 'encodeURIComponent', 'decodeURIComponent'].includes(k)
+            );
+            if (keys.length > 0) fn = global[keys[keys.length - 1]];
+        }
+        if (fn) {
+            const result = fn(..._input);
+            console.log(result !== undefined ? JSON.stringify(result) : "INTERNAL_NULL_RETURN");
+        }
+    }
+} catch (e) {
+    console.error(e.message);
+    process.exit(1);
+}`;
   }
   if (language === 'java') {
       // Find method name from code
@@ -620,10 +711,108 @@ const wrapCodeWithHarness = (code, language, input) => {
       const methodName = match ? match[1] : "solve";
       return `import java.util.*;\nimport java.util.stream.*;\n${code}\n\npublic class Main {\n    public static void main(String[] args) {\n        try {\n            Solution sol = new Solution();\n            // This is a naive but common driver for DSA\n            System.out.println(sol.${methodName}(args[0]));\n        } catch(Exception e) {\n            System.out.println("INTERNAL_NULL_RETURN");\n        }\n    }\n}`;
   }
+
+  if (language === 'cpp' || language === 'c++') {
+    // Detect the public method name from inside the Solution class
+    const methodMatch = code.match(/public:[\s\S]*?(?:vector|string|int|bool|double|long|void|unordered_map|map)\b[^(\n]* (\w+)\s*\(/);
+    const methodName = methodMatch ? methodMatch[1] : 'updateInventory';
+
+    return `#include <bits/stdc++.h>
+using namespace std;
+
+${code}
+
+unordered_map<string,int> parseJsonMap(const string& s) {
+    unordered_map<string,int> m;
+    size_t i = s.find('{');
+    if (i == string::npos) return m;
+    i++;
+    while (i < s.size()) {
+        size_t ks = s.find('"', i);
+        if (ks == string::npos) break;
+        size_t ke = s.find('"', ks + 1);
+        string key = s.substr(ks + 1, ke - ks - 1);
+        size_t colon = s.find(':', ke);
+        size_t vs = colon + 1;
+        while (vs < s.size() && (s[vs]==' '||s[vs]=='\\t')) vs++;
+        size_t ve = vs;
+        while (ve < s.size() && (isdigit(s[ve])||s[ve]=='-')) ve++;
+        int val = stoi(s.substr(vs, ve - vs));
+        m[key] = val;
+        i = ve;
+    }
+    return m;
+}
+
+int main() {
+    try {
+        string allInput, line;
+        while (getline(cin, line)) allInput += line + "\\n";
+        if (allInput.empty()) allInput = R"raw(${cleanInput})raw";
+
+        // Extract the two JSON objects from the input
+        auto findObject = [](const string& s, size_t from) -> pair<size_t,size_t> {
+            size_t start = s.find('{', from);
+            if (start == string::npos) return {string::npos, string::npos};
+            size_t depth = 0, pos = start;
+            for (; pos < s.size(); pos++) {
+                if (s[pos] == '{') depth++;
+                else if (s[pos] == '}') { depth--; if (depth == 0) break; }
+            }
+            return {start, pos};
+        };
+
+        auto [s1, e1] = findObject(allInput, 0);
+        auto [s2, e2] = findObject(allInput, e1 + 1);
+
+        if (s1 == string::npos || s2 == string::npos) {
+            cout << "INTERNAL_NULL_RETURN" << endl;
+            return 0;
+        }
+
+        unordered_map<string,int> inv = parseJsonMap(allInput.substr(s1, e1 - s1 + 1));
+        unordered_map<string,int> rst = parseJsonMap(allInput.substr(s2, e2 - s2 + 1));
+
+        Solution sol;
+        auto result = sol.${methodName}(inv, rst);
+
+        // Sort alphabetically for deterministic output
+        sort(result.begin(), result.end());
+
+        // Serialize as [{"fruit":"...","quantity":N},...]
+        string out = "[";
+        for (size_t i = 0; i < result.size(); i++) {
+            out += "{\\\"fruit\\\":\\\"" + result[i].first + "\\\",\\\"quantity\\\":" + to_string(result[i].second) + "}";
+            if (i + 1 < result.size()) out += ",";
+        }
+        out += "]";
+        cout << out << endl;
+    } catch (const exception& e) {
+        cerr << e.what() << endl;
+        return 1;
+    }
+    return 0;
+}`;
+  }
+
   return code;
 };
 
 // ── Shared Helper: Strict Comparison ───────
+const canonicalize = (val) => {
+    if (Array.isArray(val)) {
+        // Sort arrays of objects by their canonical JSON string for order-insensitive compare
+        return val.map(canonicalize).sort((a, b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : 1);
+    }
+    if (val && typeof val === 'object') {
+        // Sort object keys
+        const sorted = {};
+        Object.keys(val).sort().forEach(k => { sorted[k] = canonicalize(val[k]); });
+        return sorted;
+    }
+    return val;
+};
+
 const compareResults = (rawOutput, rawExpected) => {
     const out = String(rawOutput || "").trim();
     const exp = String(rawExpected || "").trim();
@@ -634,7 +823,8 @@ const compareResults = (rawOutput, rawExpected) => {
 
     try {
         if ((out.startsWith('[') || out.startsWith('{')) && (exp.startsWith('[') || exp.startsWith('{'))) {
-            return JSON.stringify(JSON.parse(out)) === JSON.stringify(JSON.parse(exp));
+            // Canonicalize both sides (sort arrays + object keys) for order-insensitive comparison
+            return JSON.stringify(canonicalize(JSON.parse(out))) === JSON.stringify(canonicalize(JSON.parse(exp)));
         }
     } catch (e) {}
 
@@ -663,7 +853,7 @@ exports.submitDSA = async (req, res) => {
     const testCases = question.test_cases || [];
     const executionPromises = testCases.map(async (tc) => {
         const harnessedCode = wrapCodeWithHarness(code, language, tc.input);
-        const result = await executeOnPiston(harnessedCode, language);
+        const result = await executeOnPiston(harnessedCode, language, tc.input);
         
         // Normalize results
         const rawOutput = result.stdout.trim();

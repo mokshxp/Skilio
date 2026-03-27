@@ -41,12 +41,24 @@ const InterviewRoom = () => {
         const currentRoundNum = Number(data.current_round);
         const currentRoundQs = (data.interview_questions || []).filter(q => Number(q.round_number) === currentRoundNum);
         
+        // Derive the round type from the authoritative round config sequence,
+        // not from question_type which can be stale/incorrect.
+        const { getSequence } = await import('../config/roundConfig.js');
+        const trackName = (data.round_type || data.type || 'mixed').toLowerCase();
+        const targetRole = data.target_role || '';
+        const sequence = getSequence(trackName, targetRole);
+        const roundStep = sequence.find(s => s.round === currentRoundNum);
+        const derivedRoundType = roundStep?.type 
+          || currentRoundQs[0]?.question_type 
+          || data.type 
+          || 'mcq';
+
         initSession({
           interviewId,
           session: data,
           round: {
             roundNumber: currentRoundNum,
-            roundType: currentRoundQs[0]?.question_type || data.type || 'mcq',
+            roundType: derivedRoundType,
             questions: currentRoundQs
           }
         });
@@ -137,7 +149,12 @@ const InterviewRoom = () => {
           <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
              <div className="flex items-center gap-12">
                <div className="flex items-center gap-3">
-                 <div className="w-8 h-8 rounded-lg flex items-center justify-center font-black text-lg" style={{ background: 'var(--accent)', color: 'var(--bg-0)' }}>S</div>
+                 <div style={{
+                     width: 28, height: 28, borderRadius: 8,
+                     background: 'linear-gradient(135deg, #C4501A, #ff8c00)',
+                     display: 'flex', alignItems: 'center', justifyContent: 'center',
+                     fontSize: 14, fontWeight: 900, color: '#fff',
+                 }}>S</div>
                  <span className="font-extrabold tracking-tighter text-xl uppercase italic">Skilio</span>
                </div>
 

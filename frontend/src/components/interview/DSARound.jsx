@@ -67,26 +67,42 @@ const DSARound = ({ questions = [] }) => {
     return () => observer.disconnect();
   }, []);
 
+  // Default starter code when AI didn't provide function signatures
+  const DEFAULT_SIGS = {
+    javascript: `// Write your solution below\nvar solve = function(...args) {\n    // your code here\n};\n`,
+    python: `# Write your solution below\ndef solve(*args):\n    # your code here\n    pass\n`,
+    java: `class Solution {\n    public Object solve(Object... args) {\n        // your code here\n        return null;\n    }\n}`,
+    cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nclass Solution {\npublic:\n    // your code here\n    auto solve() {\n        \n    }\n};`
+  };
+
   useEffect(() => {
     if (!question) return;
-    const sigs = question.function_signatures || question.functionSignatures || question.starter_code;
-    if (!sigs) return;
+    // Check all possible field name variants (DB snake_case vs AI camelCase)
+    const sigs = question.function_signatures 
+      || question.functionSignatures 
+      || question.starter_code 
+      || question.starterCode
+      || DEFAULT_SIGS;  // Always fall back to defaults so editor is never empty
 
     // Auto-select javascript first, then fallback to first available
     const preferred = ['javascript', 'python', 'java', 'cpp'];
     const available = preferred.find(l => sigs[l]);
-    if (available && !dsaCode[available]) {
+    if (available) {
       setDSALanguage(available);
-      updateDSACode(available, sigs[available]);
+      if (!dsaCode[available]) updateDSACode(available, sigs[available]);
     }
   }, [question]);
 
   // Separate effect: when language changes, load its signature
   useEffect(() => {
     if (!question) return;
-    const sigs = question.function_signatures || question.functionSignatures || question.starter_code;
-    if (sigs?.[dsaLanguage] && !dsaCode[dsaLanguage]) {
-      updateDSACode(dsaLanguage, sigs[dsaLanguage]);
+    const sigs = question.function_signatures 
+      || question.functionSignatures 
+      || question.starter_code 
+      || question.starterCode;
+    const code = sigs?.[dsaLanguage] || DEFAULT_SIGS[dsaLanguage];
+    if (code && !dsaCode[dsaLanguage]) {
+      updateDSACode(dsaLanguage, code);
     }
   }, [dsaLanguage, question]);
 
@@ -188,7 +204,17 @@ const DSARound = ({ questions = [] }) => {
 
               <div className="space-y-8">
                 <p className="text-lg leading-relaxed whitespace-pre-wrap tracking-tight" style={{ color: 'var(--text-1)' }}>
-                  {question.question_text || question.problemStatement}
+                  {/* Show the real problem description, skipping the DB fallback placeholder */
+                  (() => {
+                    const stmt = question.problem_statement 
+                      || question.problemStatement 
+                      || question.question_text;
+                    return (stmt && stmt !== 'Question text missing') 
+                      ? stmt 
+                      : (question.topic 
+                          ? `Solve the following ${question.topic} problem. Implement the function according to the constraints and examples below.`
+                          : 'Problem statement not available. Refer to examples and constraints below.');
+                  })()}
                 </p>
 
                 {question.examples && (

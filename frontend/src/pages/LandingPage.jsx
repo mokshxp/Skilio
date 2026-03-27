@@ -51,65 +51,65 @@ function MockHeroUI() {
     return (
         <div style={{ position: 'relative', width: '100%', maxWidth: 520, margin: '20px 0' }}>
             {/* Main IDE Window */}
-            <div style={{ background: '#0d1117', borderRadius: 16, border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 48px rgba(0,0,0,0.2)', overflow: 'hidden' }}>
+            <div style={{ background: 'var(--bg-1)', borderRadius: 16, border: '1px solid var(--border-md)', boxShadow: '0 24px 48px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
                 {/* OS Header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: '#161b22', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 16px', background: 'var(--bg-2)', borderBottom: '1px solid var(--border)' }}>
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ff5f57', boxShadow: '0 0 4px #ff5f57' }} />
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#febc2e', boxShadow: '0 0 4px #febc2e' }} />
                     <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#28c840', boxShadow: '0 0 4px #28c840' }} />
                     <span style={{ flex: 1 }} />
                     <div style={{ display: 'flex', gap: 6 }}>
-                        <span style={{ fontFamily: 'Fira Code, monospace', fontSize: 10, color: '#8b949e', background: '#21262d', padding: '4px 10px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.05)' }}>useDebounce.jsx</span>
+                        <span style={{ fontFamily: 'Fira Code, monospace', fontSize: 10, color: 'var(--text-1)', background: 'var(--bg-3)', padding: '4px 10px', borderRadius: 6, border: '1px solid var(--border)' }}>useDebounce.jsx</span>
                     </div>
                 </div>
                 {/* Code Area */}
-                <div style={{ padding: '24px 20px', fontFamily: 'Fira Code, monospace', fontSize: 13, lineHeight: 1.6, color: '#c9d1d9' }}>
+                <div style={{ padding: '24px 20px', fontFamily: 'Fira Code, monospace', fontSize: 13, lineHeight: 1.6, color: 'var(--text-0)' }}>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>1</span>
-                        <span><span style={{ color: '#ff7b72' }}>import</span> {'{'} useState, useEffect {'}'} <span style={{ color: '#ff7b72' }}>from</span> <span style={{ color: '#a5d6ff' }}>'react'</span>;</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>1</span>
+                        <span><span style={{ color: 'var(--accent)' }}>import</span> {'{'} useState, useEffect {'}'} <span style={{ color: 'var(--accent)' }}>from</span> <span style={{ color: 'var(--sky)' }}>'react'</span>;</span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>2</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>2</span>
                         <span></span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>3</span>
-                        <span><span style={{ color: '#ff7b72' }}>export function</span> <span style={{ color: '#d2a8ff' }}>useDebounce</span>(value, delay) {'{'}</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>3</span>
+                        <span><span style={{ color: 'var(--accent)' }}>export function</span> <span style={{ color: 'var(--emerald)' }}>useDebounce</span>(value, delay) {'{'}</span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>4</span>
-                        <span>&nbsp;&nbsp;<span style={{ color: '#ff7b72' }}>const</span> [dbVal, setDbVal] = <span style={{ color: '#d2a8ff' }}>useState</span>(value);</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>4</span>
+                        <span>&nbsp;&nbsp;<span style={{ color: 'var(--accent)' }}>const</span> [dbVal, setDbVal] = <span style={{ color: 'var(--emerald)' }}>useState</span>(value);</span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>5</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>5</span>
                         <span>&nbsp;&nbsp;</span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>6</span>
-                        <span>&nbsp;&nbsp;<span style={{ color: '#d2a8ff' }}>useEffect</span>(() <span style={{ color: '#ff7b72' }}>{'=>'}</span> {'{'}</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>6</span>
+                        <span>&nbsp;&nbsp;<span style={{ color: 'var(--emerald)' }}>useEffect</span>(() <span style={{ color: 'var(--accent)' }}>{'=>'}</span> {'{'}</span>
                     </div>
-                    <div style={{ display: 'flex', background: 'rgba(56,139,253,0.15)', boxShadow: 'inset 2px 0 0 #58a6ff' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>7</span>
-                        <span>&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: '#ff7b72' }}>const</span> timer = <span style={{ color: '#d2a8ff' }}>setTimeout</span>(() <span style={{ color: '#ff7b72' }}>{'=>'}</span> <span style={{ color: '#d2a8ff' }}>setDbVal</span>(value), delay);</span>
+                    <div style={{ display: 'flex', background: 'var(--accent-dim)', boxShadow: 'inset 2px 0 0 var(--accent)' }}>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>7</span>
+                        <span>&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: 'var(--accent)' }}>const</span> timer = <span style={{ color: 'var(--emerald)' }}>setTimeout</span>(() <span style={{ color: 'var(--accent)' }}>{'=>'}</span> <span style={{ color: 'var(--emerald)' }}>setDbVal</span>(value), delay);</span>
                     </div>
-                    <div style={{ display: 'flex', background: 'rgba(56,139,253,0.15)', boxShadow: 'inset 2px 0 0 #58a6ff' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>8</span>
-                        <span>&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: '#ff7b72' }}>return</span> () <span style={{ color: '#ff7b72' }}>{'=>'}</span> <span style={{ color: '#d2a8ff' }}>clearTimeout</span>(timer);<motion.span animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} style={{ display: 'inline-block', width: 8, height: 16, background: '#58a6ff', verticalAlign: 'middle', marginLeft: 4 }} /></span>
+                    <div style={{ display: 'flex', background: 'var(--accent-dim)', boxShadow: 'inset 2px 0 0 var(--accent)' }}>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>8</span>
+                        <span>&nbsp;&nbsp;&nbsp;&nbsp;<span style={{ color: 'var(--accent)' }}>return</span> () <span style={{ color: 'var(--accent)' }}>{'=>'}</span> <span style={{ color: 'var(--emerald)' }}>clearTimeout</span>(timer);<motion.span animate={{ opacity: [1, 0, 1] }} transition={{ repeat: Infinity, duration: 0.8 }} style={{ display: 'inline-block', width: 8, height: 16, background: 'var(--accent)', verticalAlign: 'middle', marginLeft: 4 }} /></span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>9</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>9</span>
                         <span>&nbsp;&nbsp;{'}'}, [value, delay]);</span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>10</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>10</span>
                         <span>&nbsp;&nbsp;</span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>11</span>
-                        <span>&nbsp;&nbsp;<span style={{ color: '#ff7b72' }}>return</span> dbVal;</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>11</span>
+                        <span>&nbsp;&nbsp;<span style={{ color: 'var(--accent)' }}>return</span> dbVal;</span>
                     </div>
                     <div style={{ display: 'flex' }}>
-                        <span style={{ color: '#484f58', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>12</span>
+                        <span style={{ color: 'var(--text-2)', userSelect: 'none', width: 24, textAlign: 'right', paddingRight: 10 }}>12</span>
                         <span>{'}'}</span>
                     </div>
                 </div>
@@ -118,14 +118,20 @@ function MockHeroUI() {
             {/* AI Call Bubble */}
             <motion.div 
                 initial={{ opacity: 0, scale: 0.8, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} transition={{ delay: 0.2, type: 'spring' }}
-                style={{ position: 'absolute', top: -20, right: -30, zIndex: 10, background: 'rgba(20, 20, 20, 0.85)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 20, padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 12px 32px rgba(0,0,0,0.3)' }}
+                style={{ 
+                    position: 'absolute', top: -20, right: -30, zIndex: 10, 
+                    background: 'var(--bg-1)', backdropFilter: 'blur(12px)', 
+                    border: '1px solid var(--border-hi)', borderRadius: 20, 
+                    padding: '12px 18px', display: 'flex', alignItems: 'center', gap: 12, 
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.1)' 
+                }}
             >
                 <div style={{ position: 'relative' }}>
                     <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'var(--bg-2)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>🤖</div>
-                    <span style={{ position: 'absolute', bottom: 2, right: -2, width: 12, height: 12, borderRadius: '50%', background: 'var(--emerald)', border: '2px solid rgba(20,20,20,1)' }}></span>
+                    <span style={{ position: 'absolute', bottom: 2, right: -2, width: 12, height: 12, borderRadius: '50%', background: 'var(--emerald)', border: '2px solid var(--bg-1)' }}></span>
                 </div>
                 <div>
-                    <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, fontWeight: 700, color: '#fff' }}>AI Interviewer</div>
+                    <div style={{ fontFamily: 'Outfit, sans-serif', fontSize: 13, fontWeight: 700, color: 'var(--text-0)' }}>AI Interviewer</div>
                     <div style={{ display: 'flex', gap: 4, alignItems: 'center', marginTop: 4 }}>
                         {[...Array(5)].map((_, i) => (
                             <motion.div key={i} animate={{ height: [4, 14, 4] }} transition={{ repeat: Infinity, duration: 1, delay: i * 0.15 }} style={{ width: 3, background: 'var(--accent)', borderRadius: 2 }} />
@@ -137,7 +143,12 @@ function MockHeroUI() {
             {/* Success Toast */}
             <motion.div 
                 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 1, type: 'spring' }}
-                style={{ position: 'absolute', bottom: -16, left: -40, zIndex: 10, background: 'var(--bg-0)', border: '1px solid var(--border)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'flex-start', gap: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.15)' }}
+                style={{ 
+                    position: 'absolute', bottom: -16, left: -40, zIndex: 10, 
+                    background: 'var(--bg-1)', border: '1px solid var(--border-hi)', 
+                    borderRadius: 14, padding: '14px 18px', display: 'flex', 
+                    alignItems: 'flex-start', gap: 14, boxShadow: '0 16px 40px rgba(0,0,0,0.12)' 
+                }}
             >
                 <div style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--emerald-dim)', color: 'var(--emerald)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>✨</div>
                 <div>
@@ -273,11 +284,17 @@ export default function LandingPage({ devMode }) {
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                     <motion.div
-                        style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg, var(--accent), var(--emerald))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, color: 'var(--bg-0)', fontFamily: 'Outfit, sans-serif' }}
+                        style={{ 
+                            width: 34, height: 34, borderRadius: 10, 
+                            background: 'linear-gradient(135deg, var(--accent), #ff8c00)', 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                            fontWeight: 900, fontSize: 13, color: 'var(--bg-0)', 
+                            fontFamily: 'Outfit, sans-serif' 
+                        }}
                         whileHover={{ scale: 1.1, rotate: 6 }}
                         transition={{ type: 'spring', stiffness: 400, damping: 15 }}
                     >S</motion.div>
-                    <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 20 }}>
+                    <span style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 800, fontSize: 22, letterSpacing: '-0.02em', marginTop: '-1px' }}>
                         Skili<span style={{ color: 'var(--accent)' }}>o</span>
                     </span>
                 </div>

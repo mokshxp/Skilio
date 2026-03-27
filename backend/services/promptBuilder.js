@@ -80,38 +80,42 @@ Do NOT include any text outside the JSON array.`;
 
     case "dsa":
       return `${roleContext}
-Generate a unique DSA coding problem that a ${role} would realistically solve. 
-This should feel like a real-world problem a ${role} might encounter, not a generic, disconnected whiteboard puzzle.
+Generate ONE complete DSA coding problem for a ${role} candidate.
+Difficulty: ${difficulty}. Focus areas: ${config.dsaFocus.join(", ")}.
 
-Preferred role DNA focus areas for this problem: ${config.dsaFocus.join(", ")}.
-Difficulty Level: ${difficulty}.
+IMPORTANT: You MUST fill in EVERY field with real content. Do NOT use "..." placeholders.
 
-Required Output Format: Return ONLY a raw JSON object. NO preamble, NO markdown code blocks.
+Respond ONLY with this exact JSON object (no markdown, no explanation, no wrapper):
 {
-  "title": "Problem Title",
-  "slug": "problem-slug",
+  "title": "Two Sum",
+  "slug": "two-sum",
   "difficulty": "${difficulty}",
-  "topic": "Main Topic",
-  "problemStatement": "Clear, detailed markdown problem statement...",
+  "topic": "Arrays, HashMaps",
+  "problemStatement": "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target. You may assume that each input would have exactly one solution, and you may not use the same element twice.",
   "examples": [
-    { "id": 1, "input": "...", "output": "...", "explanation": "..." }
+    { "id": 1, "input": "nums = [2,7,11,15], target = 9", "output": "[0,1]", "explanation": "Because nums[0] + nums[1] == 9, we return [0, 1]." },
+    { "id": 2, "input": "nums = [3,2,4], target = 6", "output": "[1,2]", "explanation": "Because nums[1] + nums[2] == 6, we return [1, 2]." }
   ],
-  "constraints": "Markdown list of constraints...",
+  "constraints": "2 <= nums.length <= 10^4\\n-10^9 <= nums[i] <= 10^9\\nOnly one valid answer exists.",
   "functionSignatures": {
-    "python": "def solve(self, ...):\\n    ",
-    "javascript": "var solve = function(...) {\\n    \\n};",
-    "java": "public class Solution {\\n    public ... solve(...) {\\n    }\\n}",
-    "cpp": "class Solution {\\npublic:\\n    ... solve(...) {\\n    }\\n};"
+    "python": "def solve(nums, target):\\n    # your code here\\n    pass",
+    "javascript": "var solve = function(nums, target) {\\n    // your code here\\n};",
+    "java": "class Solution {\\n    public int[] solve(int[] nums, int target) {\\n        // your code here\\n        return new int[]{};\\n    }\\n}",
+    "cpp": "class Solution {\\npublic:\\n    vector<int> solve(vector<int>& nums, int target) {\\n        // your code here\\n        return {};\\n    }\\n};"
   },
   "test_cases": [
-    { "id": 1, "input": "...", "expectedOutput": "...", "isVisible": true },
-    { "id": 2, "input": "...", "expectedOutput": "...", "isVisible": false }
+    { "id": 1, "input": "[2,7,11,15], 9", "expectedOutput": "[0,1]", "isVisible": true },
+    { "id": 2, "input": "[3,2,4], 6", "expectedOutput": "[1,2]", "isVisible": true },
+    { "id": 3, "input": "[3,3], 6", "expectedOutput": "[0,1]", "isVisible": false }
   ],
-  "hints": ["Subtle hint 1", "Deeper hint 2"],
-  "timeComplexityExpected": "O(...)",
-  "spaceComplexityExpected": "O(...)"
+  "hints": ["Try using a hash map to store values you have seen so far.", "For each element, check if target minus that element exists in your map."],
+  "timeComplexityExpected": "O(n)",
+  "spaceComplexityExpected": "O(n)"
 }
-Rule: Output ONLY the raw JSON object starting with { and ending with }.`;
+
+Replace the example above with a COMPLETELY DIFFERENT, ORIGINAL problem tailored for a ${role} role at ${difficulty} difficulty.
+EVERY field must be fully filled with real, specific content following the same structure. The functionSignatures MUST have correct, runnable code stubs in all 4 languages.`;
+
 
     case "behavioral":
       const behavioralFocus = config.behavioralFocus.join(", ");

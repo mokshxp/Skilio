@@ -52,9 +52,18 @@ export default function Footer({ className = "" }) {
                     {/* Brand Column */}
                     <div className="flex flex-col">
                         <Link to="/" className="inline-block mb-4">
-                            <span className="font-['Outfit'] text-[22px] font-extrabold tracking-tighter text-[var(--text-0)]">
-                                Skili<span className="text-[var(--accent)]">o</span>
-                            </span>
+                            <div className="flex items-center gap-2.5">
+                                <div style={{
+                                    width: 20, height: 20, borderRadius: 6,
+                                    background: 'linear-gradient(135deg, #C4501A, #ff8c00)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    fontSize: 10, fontWeight: 900, color: '#fff',
+                                    opacity: 0.85
+                                }}>S</div>
+                                <span className="font-['Outfit'] text-[21px] font-extrabold tracking-tighter text-[var(--text-0)]">
+                                    Skili<span className="text-[var(--accent)]">o</span>
+                                </span>
+                            </div>
                         </Link>
                         <p className="text-[var(--text-2)] text-[13px] leading-relaxed max-w-[240px] font-medium opacity-80 mb-6">
                             Master your interviews with AI-powered sessions and personalized roadmaps.

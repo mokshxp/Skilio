@@ -134,15 +134,16 @@ export default function TopNav({ devMode }) {
                 {/* LEFT: Logo */}
                 <div 
                     onClick={() => navigate('/')}
-                    className="skilio-nav-logo"
+                    className="skilio-nav-logo flex items-center gap-2.5 cursor-pointer group"
                 >
                     <div style={{
-                        width: 24, height: 24, borderRadius: 6,
+                        width: 28, height: 28, borderRadius: 8,
                         background: 'linear-gradient(135deg, #C4501A, #ff8c00)',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 12, fontWeight: 900, color: '#fff',
+                        fontSize: 14, fontWeight: 900, color: '#fff',
+                        boxShadow: '0 2px 8px rgba(196,80,26,0.2)'
                     }}>S</div>
-                    <span className="skilio-nav-logo-text">
+                    <span className="skilio-nav-logo-text" style={{ marginTop: '1px' }}>
                         Skilio
                     </span>
                 </div>
