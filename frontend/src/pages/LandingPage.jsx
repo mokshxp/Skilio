@@ -374,7 +374,7 @@ export default function LandingPage({ devMode }) {
                     </motion.div>
                     {/* Right — floating mock UI */}
                     <motion.div variants={fadeRight} initial="hidden" animate="show" style={{ display: 'flex', justifyContent: 'flex-end', transformOrigin: 'center' }}>
-                        <motion.div animate={{ y: [0, -25, 0], rotate: [0, -1, 0] }} transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}>
+                        <motion.div animate={{ y: [0, -15, 0] }} transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}>
                             <MockHeroUI />
                         </motion.div>
                     </motion.div>
@@ -457,7 +457,7 @@ export default function LandingPage({ devMode }) {
             <section style={{ ...sectionPad, background: `linear-gradient(180deg, transparent, var(--bg-1), transparent)` }}>
                 <div style={{ ...maxW, display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: 60, alignItems: 'center' }}>
                     <motion.div variants={fadeLeft} initial="hidden" whileInView="show" viewport={{ once: true }} style={{ transformOrigin: 'center' }}>
-                        <motion.div animate={{ y: [0, -20, 0], rotate: [0, 1.5, 0] }} transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}>
+                        <motion.div animate={{ y: [0, -12, 0] }} transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}>
                             <MockInterviewUI />
                         </motion.div>
                     </motion.div>
@@ -501,7 +501,7 @@ export default function LandingPage({ devMode }) {
                         </motion.ul>
                     </motion.div>
                     <motion.div variants={fadeRight} initial="hidden" whileInView="show" viewport={{ once: true }} style={{ display: 'flex', justifyContent: 'flex-end', transformOrigin: 'center' }}>
-                        <motion.div animate={{ y: [0, -22, 0], rotate: [0, -1.2, 0] }} transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}>
+                        <motion.div animate={{ y: [0, -14, 0] }} transition={{ duration: 11, repeat: Infinity, ease: 'easeInOut' }}>
                             <MockCopilotUI />
                         </motion.div>
                     </motion.div>
@@ -516,7 +516,7 @@ export default function LandingPage({ devMode }) {
             <section style={{ ...sectionPad, background: `linear-gradient(180deg, transparent, var(--bg-1), transparent)` }}>
                 <div style={{ ...maxW, display: 'grid', gridTemplateColumns: '1fr 1.1fr', gap: 60, alignItems: 'center' }}>
                     <motion.div variants={fadeLeft} initial="hidden" whileInView="show" viewport={{ once: true }} style={{ transformOrigin: 'center' }}>
-                        <motion.div animate={{ y: [0, -24, 0], rotate: [0, 1, 0] }} transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}>
+                        <motion.div animate={{ y: [0, -16, 0] }} transition={{ duration: 13, repeat: Infinity, ease: 'easeInOut' }}>
                             <MockAnalyticsUI />
                         </motion.div>
                     </motion.div>

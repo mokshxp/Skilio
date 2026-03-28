@@ -9,6 +9,7 @@ router.post("/start", authMiddleware, interviewSchemas.startInterview, interview
 router.post("/round/complete", authMiddleware, interviewController.completeRound);
 router.post("/dsa/submit", authMiddleware, interviewController.submitDSA);
 router.post("/dsa/run", authMiddleware, interviewController.runDSA);
+router.post("/end", authMiddleware, interviewController.endInterview);
 router.get("/", authMiddleware, interviewSchemas.listSessions, interviewController.listInterviews);
 router.get("/:id/results", authMiddleware, interviewController.getResults);
 router.get("/session/:id", authMiddleware, interviewController.getSession);

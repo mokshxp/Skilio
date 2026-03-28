@@ -164,10 +164,10 @@ export default function TopNav({ devMode }) {
                 {/* RIGHT SECTION */}
                 <div className="skilio-nav-right">
                     
-                    {/* Plan label — subtitle text */}
-                    <span className="skilio-nav-plan">
-                        {plan === 'free' ? 'Free' : plan}
-                    </span>
+                    {/* Plan Badge — Dynamic sync with subscription state */}
+                    <div style={{ marginRight: '8px' }}>
+                        <PlanBadge plan={plan} size="sm" />
+                    </div>
 
                     {/* Theme switcher */}
                     <ThemeSwitcher />

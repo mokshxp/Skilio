@@ -255,6 +255,76 @@ const useInterviewStore = create(
 
       setHRIndex: (index) => set({ hrCurrentIndex: index }),
 
+      completeAptitudeRound: async (answers) => {
+        const { interviewId, currentRound } = get();
+        set({ roundStatus: 'submitting' });
+        try {
+          const responses = (answers || []).map(a => ({
+            questionId: a.questionId,
+            answer: a.selected || null,
+            isCorrect: a.isCorrect,
+            category: a.category,
+            timeTaken: 90,
+          }));
+
+          const res = await interviewApi.completeRound(interviewId, {
+            roundNumber: currentRound,
+            responses,
+          });
+
+          const { roundSummary, nextRound, isComplete } = res;
+
+          if (isComplete) {
+            set((state) => ({
+              roundSummaries: [...state.roundSummaries, roundSummary],
+              roundStatus: 'complete',
+              isInterviewComplete: true,
+            }));
+          } else {
+            set((state) => ({
+              roundSummaries: [...state.roundSummaries, roundSummary],
+              currentRound: nextRound.roundNumber,
+              roundType: nextRound.roundType,
+              roundData: nextRound,
+              roundStatus: 'active',
+              nextRoundData: null,
+              // Reset per-round state
+              mcqQuestions: (nextRound.roundType === 'mcq' || nextRound.roundType === 'technical') ? nextRound.questions || [] : [],
+              mcqAnswers: {},
+              mcqCurrentIndex: 0,
+              dsaQuestions: (nextRound.roundType === 'coding' || nextRound.roundType === 'dsa') ? nextRound.questions || [] : [],
+              dsaCode: { python: '', javascript: '', java: '', cpp: '' },
+              dsaTestResults: [],
+              dsaAttempts: 0,
+              hrQuestions: (nextRound.roundType === 'hr' || nextRound.roundType === 'behavioural' || nextRound.roundType === 'behavioral') ? nextRound.questions || [] : [],
+              hrAnswers: {},
+              hrCurrentIndex: 0,
+            }));
+          }
+        } catch (err) {
+          console.error('Aptitude round submission failed', err);
+          set({ roundStatus: 'active' });
+        }
+      },
+
+      endInterview: async () => {
+        const { interviewId } = get();
+        try {
+          await interviewApi.post(`/interview/end`, { interviewId });
+          set({
+            isInterviewComplete: true,
+            roundStatus: 'complete'
+          });
+        } catch (err) {
+          console.error("End interview failed", err);
+          // Fallback: still show report even if API fails to update status
+          set({
+            isInterviewComplete: true,
+            roundStatus: 'complete'
+          });
+        }
+      },
+
     setRoundStatus: (status) => set({ roundStatus: status }),
 
     clearLastSubmission: () => set({ lastDSASubmission: null }),

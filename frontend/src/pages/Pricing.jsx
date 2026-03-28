@@ -76,7 +76,7 @@ function PricingCard({ plan, billing, currentPlan, onSelect, index }) {
           <div className="mb-8">
             <div className="flex items-baseline gap-1">
               <span className="text-5xl font-extrabold tracking-tighter text-[var(--text-0)]">
-                ${price}
+                ₹{price}
               </span>
               <span className="text-[var(--text-2)] font-medium">
                 {plan.id === 'free' ? '/forever' : isAnnual ? '/mo' : '/mo'}
@@ -164,7 +164,7 @@ export default function Pricing() {
       id: 'pro',
       name: 'Pro',
       description: 'Comprehensive prep for serious candidates.',
-      price: { monthly: 19, annual: 15 },
+      price: { monthly: 499, annual: 399 },
       badge: 'Most Popular',
       highlight: true,
       cta: 'Upgrade to Pro',
@@ -181,7 +181,7 @@ export default function Pricing() {
       id: 'enterprise',
       name: 'Enterprise',
       description: 'Premium features for teams and heavy users.',
-      price: { monthly: 49, annual: 39 },
+      price: { monthly: 799, annual: 649 },
       badge: null,
       customBadge: 'Best for Teams',
       highlight: false,

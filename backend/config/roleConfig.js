@@ -1,6 +1,9 @@
 /**
  * ROLE_CONFIG: The single source of truth for role-specific interview DNA.
  * Defines core topics, system design focus, DSA priorities, and behavioral themes.
+ *
+ * APTITUDE_CONFIG: Defines the aptitude round structure for Mixed track interviews.
+ * Categories, weights, question count, and time-per-question.
  */
 const ROLE_CONFIG = {
   "ML Engineer": {
@@ -215,4 +218,45 @@ const ROLE_CONFIG = {
   }
 };
 
-module.exports = { ROLE_CONFIG };
+/**
+ * APTITUDE_CONFIG: Drives the Aptitude round (type: "aptitude") in Mixed track.
+ * Each category weight must sum to 100.
+ */
+const APTITUDE_CONFIG = {
+  categories: [
+    {
+      id: "alphabet_series",
+      label: "Alphabet Series & Sequence",
+      weight: 20, // % of questions from this category
+      description: "Letter pattern completion, alphabetical ordering",
+    },
+    {
+      id: "coding_decoding",
+      label: "Coding-Decoding",
+      weight: 20,
+      description: "Cipher patterns, letter/number substitution",
+    },
+    {
+      id: "ages",
+      label: "Ages",
+      weight: 20,
+      description: "Age calculation problems with ratios and time shifts",
+    },
+    {
+      id: "partnership",
+      label: "Partnership",
+      weight: 20,
+      description: "Profit sharing based on investment and time",
+    },
+    {
+      id: "number_series",
+      label: "Number Series",
+      weight: 20,
+      description: "Arithmetic, geometric, and mixed number patterns",
+    },
+  ],
+  totalQuestions: 20,
+  timePerQuestion: 90, // seconds
+};
+
+module.exports = { ROLE_CONFIG, APTITUDE_CONFIG };

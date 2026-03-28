@@ -19,8 +19,8 @@ const PLANS = {
   pro: {
     id: 'pro',
     name: 'Pro',
-    price: 19,
-    priceDisplay: '$19',
+    price: 499,
+    priceDisplay: '₹499',
     limits: {
       interviewsPerMonth: Infinity,
       resumeUploadsPerMonth: 5,
@@ -33,8 +33,8 @@ const PLANS = {
   enterprise: {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 49,
-    priceDisplay: '$49',
+    price: 799,
+    priceDisplay: '₹799',
     limits: {
       interviewsPerMonth: Infinity,
       resumeUploadsPerMonth: Infinity,

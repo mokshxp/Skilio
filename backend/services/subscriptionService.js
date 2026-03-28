@@ -5,9 +5,15 @@ const { PLANS } = require('./plans');
  * Fetch a user's subscription details. Default to 'free' if missing.
  */
 async function getUserSubscription(userId) {
-    // ── DEV BYPASS ──────────────────────────────────────────────
-    // If we're in local development, treat every user as a Pro user
-    if (process.env.NODE_ENV !== 'production' || process.env.DEV_BYPASS === 'true') {
+    // ── ADMIN BYPASS ──────────────────────────────────────────────
+    // The founder always gets Pro/Enterprise access to demonstrate the platform.
+    // Everyone else will hit the normal free tier limits and see subscription suggestions.
+    const ADMIN_USERS = [
+        "user_3Aa5GqJxkWlcnWl9FsymqjSHRKD", // Your primary admin Clerk ID
+        process.env.ADMIN_USER_ID           // Optional fallback env variable
+    ];
+
+    if (ADMIN_USERS.includes(userId)) {
         return {
             user_id: userId,
             plan: 'pro', // Give full access to everything in dev
@@ -24,37 +30,16 @@ async function getUserSubscription(userId) {
         .eq('user_id', userId)
         .single();
 
-    if (error || !data) {
-        // No subscription found = free plan
-        return {
-            user_id: userId,
-            plan: 'free',
-            status: 'active',
-            interviews_used_this_month: 0,
-            resume_uploads_this_month: 0,
-        };
-    }
+    const result = data || {
+        user_id: userId,
+        plan: 'free',
+        status: 'active',
+        interviews_used_this_month: 0,
+        resume_uploads_this_month: 0,
+    };
 
-    // Reset usage if past reset date
-    const now = new Date();
-    if (data.usage_reset_date && new Date(data.usage_reset_date) < now) {
-        const nextReset = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
-        const { data: updated, error: upErr } = await supabase
-            .from('subscriptions')
-            .update({
-                interviews_used_this_month: 0,
-                resume_uploads_this_month: 0,
-                usage_reset_date: nextReset,
-                updated_at: now.toISOString()
-            })
-            .eq('user_id', userId)
-            .select()
-            .single();
-            
-        if (!upErr && updated) return updated;
-    }
-
-    return data;
+    console.log(`[SUBSCRIPTION] User ${userId} checked. Plan: ${result.plan}${result.is_dev_bypass ? ' (ADMIN BYPASS)' : ''}`);
+    return result;
 }
 
 /**

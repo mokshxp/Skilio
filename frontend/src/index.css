@@ -1243,7 +1243,7 @@ body {
     border-radius: 50%;
     filter: blur(80px);
     pointer-events: none;
-    animation: breathe 5s ease-in-out infinite;
+    will-change: transform;
 }
 
 .orb-amber {
@@ -1659,6 +1659,29 @@ body {
     font-size: 1rem;
     font-weight: 700;
     margin: 0;
+}
+
+.billing-plan-card__plan {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.billing-plan-card__status {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.billing-plan-card__actions {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
 }
 
 /* ═══════════════════════════════════════════

@@ -55,9 +55,10 @@ export default function Billing() {
 
           <div className="billing-plan-card__plan">
             <PlanBadge plan={plan} size="lg" />
-            <span className="billing-plan-card__status" style={{ color: statusInfo.color }}>
-              {statusInfo.icon} {statusInfo.label}
-            </span>
+            <div className="billing-plan-card__status" style={{ color: statusInfo.color }}>
+              {statusInfo.icon}
+              <span>{statusInfo.label}</span>
+            </div>
           </div>
 
           <div className="billing-plan-card__actions">
@@ -107,7 +108,7 @@ export default function Billing() {
           </div>
           <button className="btn-amber btn-md" onClick={() => navigate('/pricing')}>
             <Zap size={14} />
-            Upgrade to Pro — $19/mo
+            Upgrade to Pro — ₹1499/mo
           </button>
         </motion.div>
       )}

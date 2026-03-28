@@ -225,13 +225,14 @@ exports.startInterview = async (req, res) => {
     log('7. Generating questions via AI...', { firstRoundType: firstRound.type });
     let questions;
     try {
-      if (firstRound.type === 'mcq' || firstRound.type === 'technical') {
+      if (firstRound.type === 'mcq' || firstRound.type === 'technical' || firstRound.type === 'aptitude') {
         questions = await generateMCQBatch({
           targetRole,
           skills: resumeData?.skills || [],
           experienceYears: resumeData?.experience_years || 0,
           difficulty: firstRound.difficulty || difficulty,
-          roundNumber: 1
+          roundNumber: 1,
+          roundType: firstRound.type
         });
       } else if (firstRound.type === 'dsa' || firstRound.type === 'coding') {
         questions = await generateDSAProblemBatch({
@@ -309,8 +310,49 @@ exports.startInterview = async (req, res) => {
       }
     });
 
+    // 11. Run Background Pre-Generator Non-Blocking
+    try {
+      const { preGenerateRemainingRounds } = require('../services/preGenerator');
+      preGenerateRemainingRounds({
+        sequence,
+        startFromIndex: 1, // Start generating Round 2 and beyond
+        interviewId: interview.id,
+        role: targetRole,
+        difficulty: difficulty,
+        resumeContext: resumeContext
+      }).catch(err => console.error("[Background Pre-Gen Async Error]", err));
+    } catch (e) {
+      console.error("[Background Pre-Gen Trigger Error]", e);
+    }
+
   } catch (err) {
-    log('11. UNHANDLED ERROR', { message: err.message, stack: err.stack });
+  }
+};
+
+/**
+ * Early termination of interview
+ * POST /api/interview/end
+ */
+exports.endInterview = async (req, res) => {
+  try {
+    const interviewId = req.body.interviewId?.toString().replace('sess_', '');
+    const { userId } = typeof req.auth === 'function' ? req.auth() : req.auth;
+
+    const { data: interview, error } = await supabase
+      .from("interviews")
+      .update({ 
+        status: "completed", 
+        completed_at: new Date().toISOString() 
+      })
+      .eq("id", interviewId)
+      .eq("user_id", userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    res.json({ success: true, session: interview });
+  } catch (err) {
+    console.error("[EndInterview Controller Error]", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -440,104 +482,136 @@ exports.completeRound = async (req, res) => {
     let savedNextQs = [];
     let nextRoundType = nextRoundStep?.type || '';
 
-    if (nextRoundType === 'dsa' || nextRoundType === 'coding') {
-      nextRoundType = 'dsa';
-      nextRoundQuestions = await generateDSAProblemBatch({
-        targetRole: interview.target_role,
-        difficulty: nextRoundStep?.difficulty || 'medium',
-        roundNumber: nextRoundNumber
-      });
-      console.log('[DSA DEBUG] title:', nextRoundQuestions?.title);
-      console.log('[DSA DEBUG] type:', Array.isArray(nextRoundQuestions) ? 'ARRAY (bad)' : 'OBJECT (good)');
-    } else if (nextRoundType === 'hr' || nextRoundType === 'behavioral') {
-      nextRoundType = 'hr';
-      nextRoundQuestions = await generateHRBatch({
-        targetRole: interview.target_role,
-        experienceYears: interview.resume_context?.experience || 0
-      });
-    } else if (nextRoundType === 'mcq' || nextRoundType === 'technical') {
-      nextRoundType = 'mcq';
-      nextRoundQuestions = await generateMCQBatch({
-        targetRole: interview.target_role,
-        difficulty: nextRoundStep?.difficulty || 'medium',
-        roundNumber: nextRoundNumber
-      });
+    if (nextRoundType === 'dsa' || nextRoundType === 'coding') nextRoundType = 'dsa';
+    else if (nextRoundType === 'hr' || nextRoundType === 'behavioral') nextRoundType = 'hr';
+    else if (nextRoundType === 'mcq' || nextRoundType === 'technical') nextRoundType = 'mcq';
+    else if (nextRoundType === 'aptitude') nextRoundType = 'aptitude';
+
+    const { waitForRound } = require('../services/preGenerator');
+    let fallbackGenerationNeeded = false;
+
+    // Check pre-generation status
+    const { data: nextRoundData } = await supabase
+      .from("interview_rounds")
+      .select("status")
+      .eq("interview_id", interviewId)
+      .eq("round_number", nextRoundNumber)
+      .maybeSingle();
+
+    if (nextRoundData?.status === "ready") {
+       const { data: q } = await supabase
+        .from("interview_questions")
+        .select("*")
+        .eq("interview_id", interviewId)
+        .eq("round_number", nextRoundNumber);
+       savedNextQs = q || [];
+    } else if (nextRoundData?.status === "generating") {
+       try {
+         savedNextQs = await waitForRound(interviewId, nextRoundNumber);
+       } catch (err) {
+         fallbackGenerationNeeded = true;
+       }
+    } else {
+       fallbackGenerationNeeded = true; // "failed" or no data
     }
 
-    // 7. Process questions into the new schema
-    const questionsArr = Array.isArray(nextRoundQuestions) ? nextRoundQuestions : [nextRoundQuestions];
-    for (const q of questionsArr) {
+    if ((fallbackGenerationNeeded || savedNextQs.length === 0) && nextRoundStep) {
+      console.warn(`[V2] Fallback generating Round ${nextRoundNumber} synchronously`);
+      
       if (nextRoundType === 'dsa') {
-        // A. Upsert to base question bank
-        const slug = q.slug || q.question_slug || (q.title ? q.title.toLowerCase().replace(/\s+/g, '-') : 'problem');
-        const { data: baseQ, error: baseErr } = await supabase
-          .from("dsa_questions")
-          .upsert({
-            title: q.title || q.topic || "Coding Challenge",
-            slug: slug,
-            topic: q.topic || "Algorithms",
-            difficulty: nextRoundStep?.difficulty || 'medium',
-            base_description: q.problemStatement || q.questionText || q.question_text || "",
-            constraints: Array.isArray(q.constraints) ? q.constraints : [q.constraints],
-            created_at: new Date()
-          }, { onConflict: 'slug' })
-          .select()
-          .single();
+        nextRoundQuestions = await generateDSAProblemBatch({
+          targetRole: interview.target_role,
+          difficulty: nextRoundStep?.difficulty || 'medium',
+          roundNumber: nextRoundNumber
+        });
+      } else if (nextRoundType === 'hr') {
+        nextRoundQuestions = await generateHRBatch({
+          targetRole: interview.target_role,
+          experienceYears: interview.resume_context?.experience || 0
+        });
+      } else if (nextRoundType === 'mcq' || nextRoundType === 'aptitude') {
+        nextRoundQuestions = await generateMCQBatch({
+          targetRole: interview.target_role,
+          difficulty: nextRoundStep?.difficulty || 'medium',
+          roundNumber: nextRoundNumber,
+          roundType: nextRoundStep?.type
+        });
+      }
 
-        if (baseQ) {
-          // B. Insert into session questions with AI variation
-          await supabase.from("session_questions").insert({
-            session_id: interviewId,
-            question_id: baseQ.id,
-            ai_variation: q, // full AI JSON
+      const questionsArr = Array.isArray(nextRoundQuestions) ? nextRoundQuestions : [nextRoundQuestions];
+      let nextQsInsertArray = [];
+
+      for (const q of questionsArr) {
+        if (nextRoundType === 'dsa') {
+          const slug = q.slug || q.question_slug || (q.title ? q.title.toLowerCase().replace(/\s+/g, '-') : 'problem');
+          const { data: baseQ } = await supabase
+            .from("dsa_questions")
+            .upsert({
+              title: q.title || q.topic || "Coding Challenge",
+              slug: slug,
+              topic: q.topic || "Algorithms",
+              difficulty: nextRoundStep?.difficulty || 'medium',
+              base_description: q.problemStatement || q.questionText || q.question_text || "",
+              constraints: Array.isArray(q.constraints) ? q.constraints : [q.constraints],
+              created_at: new Date()
+            }, { onConflict: 'slug' })
+            .select()
+            .single();
+
+          if (baseQ) {
+            await supabase.from("session_questions").insert({
+              session_id: interviewId,
+              question_id: baseQ.id,
+              ai_variation: q,
+              test_cases: q.test_cases || q.testCases || null,
+              difficulty: baseQ.difficulty,
+              order_index: 1
+            });
+          }
+        }
+
+        let nextQsInsert = {
+          interview_id: interviewId,
+          round_number: nextRoundNumber,
+          question_type: nextRoundType === 'dsa' ? 'coding' : nextRoundType,
+          difficulty: q.difficulty || interview.difficulty,
+          topic: q.topic || q.title || q.subject || null,
+        };
+
+        if (nextRoundType === 'dsa') {
+          Object.assign(nextQsInsert, {
+            question_text: q.title || "Coding Challenge",
+            slug: q.slug || q.question_slug || null,
+            subject: 'DSA',
+            problem_statement: q.problemStatement || q.question_text || "",
+            function_signatures: q.functionSignatures || q.function_signature || null,
+            examples: q.examples || null,
             test_cases: q.test_cases || q.testCases || null,
-            difficulty: baseQ.difficulty,
-            order_index: 1
+            hints: q.hints || null,
+            constraints: q.constraints || null,
+            time_complexity_expected: q.timeComplexityExpected || null,
+            space_complexity_expected: q.spaceComplexityExpected || null,
+          });
+        } else {
+          Object.assign(nextQsInsert, {
+            question_text: q.questionText || q.question_text || "",
+            options: q.options || null,
+            correct_answer: q.correct_answer || q.correctAnswer || null,
+            explanation: q.explanation || null,
           });
         }
+
+        nextQsInsertArray.push(nextQsInsert);
       }
-
-      // Also keep interview_questions for backward compatibility/unified MCQ flow
-      let nextQsInsert = {
-        interview_id: interviewId,
-        round_number: nextRoundNumber,
-        question_type: nextRoundType === 'dsa' ? 'coding' : nextRoundType,
-        difficulty: q.difficulty || interview.difficulty,
-        topic: q.topic || q.title || q.subject || null,
-      };
-
-      if (nextRoundType === 'dsa') {
-        Object.assign(nextQsInsert, {
-          question_text: q.title || "Coding Challenge",
-          slug: q.slug || q.question_slug || null,
-          subject: 'DSA',
-          problem_statement: q.problemStatement || q.question_text || "",
-          function_signatures: q.functionSignatures || q.function_signature || null,
-          examples: q.examples || null,
-          test_cases: q.test_cases || q.testCases || null,
-          hints: q.hints || null,
-          constraints: q.constraints || null,
-          time_complexity_expected: q.timeComplexityExpected || null,
-          space_complexity_expected: q.spaceComplexityExpected || null,
-        });
-      } else {
-        Object.assign(nextQsInsert, {
-          question_text: q.questionText || q.question_text || "",
-          options: q.options || null,
-          correct_answer: q.correct_answer || q.correctAnswer || null,
-          explanation: q.explanation || null,
-        });
-      }
-
-      const { data: insData, error: insErr } = await supabase.from("interview_questions").insert([nextQsInsert]).select();
-      if (insErr) {
-        console.error("❌ [V2] Failed to insert interview_question:", insErr);
-        // If we can't save the questions, we should NOT move the interview round forward
-        // However, we're already halfway through. We'll return the error later.
-      } else {
-        console.log(`✅ [V2] Inserted Round ${nextRoundNumber} questions for session ${interviewId}`);
-        // Add to our return list if select() didn't return them for some reason
-        if (savedNextQs.length === 0 && insData) savedNextQs.push(...insData);
+      
+      if (nextQsInsertArray.length > 0) {
+        const { data: insData, error: insErr } = await supabase.from("interview_questions").insert(nextQsInsertArray).select();
+        if (insErr) {
+          console.error("❌ [V2] Failed to batch insert fallback interview_questions:", insErr);
+        } else {
+          console.log(`✅ [V2] Batch inserted fallback ${insData.length} questions for Round ${nextRoundNumber}`);
+          if (savedNextQs.length === 0 && insData) savedNextQs.push(...insData);
+        }
       }
     }
 

@@ -29,9 +29,9 @@ const PLANS = {
     pro: {
         id: 'pro',
         name: 'Pro',
-        price: 19,
-        priceDisplay: '$19',
-        priceAnnual: 190,
+        price: 499,
+        priceDisplay: '₹499',
+        priceAnnual: 4990,
         description: 'For serious candidates',
         color: '#ffb703', // var(--accent)
         badge: 'Popular',
@@ -55,9 +55,9 @@ const PLANS = {
     enterprise: {
         id: 'enterprise',
         name: 'Enterprise',
-        price: 49,
-        priceDisplay: '$49',
-        priceAnnual: 490,
+        price: 799,
+        priceDisplay: '₹799',
+        priceAnnual: 7990,
         description: 'For teams & power users',
         color: '#00d4ff', // var(--carbon accent)
         limits: {

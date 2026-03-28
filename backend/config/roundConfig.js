@@ -20,10 +20,10 @@ const ROUND_SEQUENCES = {
     { round: 3, type: "hr",         label: "Leadership",     icon: "👑", difficulty: "hard" },
   ],
   mixed: [
-    { round: 1, type: "mcq",        label: "Core CS",        icon: "🧠", difficulty: "easy" },
-    { round: 2, type: "mcq",        label: "System Design",  icon: "🏗️", difficulty: "medium" },
-    { round: 3, type: "dsa",        label: "DSA Challenge",  icon: "⚡", difficulty: "medium" },
-    { round: 4, type: "dsa",        label: "Coding Round",   icon: "💻", difficulty: "hard" },
+    { round: 1, type: "aptitude",   label: "Aptitude",       icon: "🔢", difficulty: "medium" },
+    { round: 2, type: "mcq",        label: "Core CS",        icon: "🧠", difficulty: "medium" },
+    { round: 3, type: "mcq",        label: "System Design",  icon: "🏗️", difficulty: "medium" },
+    { round: 4, type: "dsa",        label: "DSA Challenge",  icon: "⚡", difficulty: "hard" },
     { round: 5, type: "hr",         label: "Behavioural",    icon: "🤝", difficulty: "medium" },
   ],
 

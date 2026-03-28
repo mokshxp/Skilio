@@ -4,10 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import useInterviewStore from '../store/interviewStore';
 import { interviewApi } from '../services/api';
 
-// V2 Components
-import MCQRound from '../components/interview/MCQRound';
-import DSARound from '../components/interview/DSARound';
-import HRRound from '../components/interview/HRRound';
+// V2 Components - Lazy loaded for performance
+const MCQRound = React.lazy(() => import('../components/interview/MCQRound'));
+const DSARound = React.lazy(() => import('../components/interview/DSARound'));
+const HRRound = React.lazy(() => import('../components/interview/HRRound'));
+const AptitudeRound = React.lazy(() => import('../components/rounds/AptitudeRound'));
+
 import RoundSummary from '../components/interview/RoundSummary';
 import FinalReport from '../components/interview/FinalReport';
 import InterviewNavbar from '../components/interview/InterviewNavbar';
@@ -26,8 +28,14 @@ const InterviewRoom = () => {
     roundStatus,
     initSession,
     roundSummaries,
-    isInterviewComplete
+    isInterviewComplete,
+    completeAptitudeRound,
+    endInterview
   } = useInterviewStore();
+
+  const handleRoundComplete = async (answers) => {
+    await completeAptitudeRound(answers);
+  };
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -104,7 +112,35 @@ const InterviewRoom = () => {
     );
   }
 
+  const RoundLoader = () => (
+    <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-6" style={{ color: 'var(--text-1)', fontFamily: 'Fira Code, monospace', fontSize: 13 }}>
+      <div style={{
+        width: 28, height: 28,
+        border: "2px solid var(--bg-2)",
+        borderTop: "2px solid var(--accent)",
+        borderRadius: "50%",
+        animation: "spin 0.8s linear infinite",
+      }} />
+      <p className="animate-pulse">Loading specialized round assets...</p>
+    </div>
+  );
+
   const renderContent = () => {
+    if (roundStatus === 'submitting') {
+      return (
+        <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-6">
+          <div className="relative">
+            <div className="absolute inset-0 blur-xl rounded-full animate-pulse opacity-20" style={{ background: 'var(--accent)' }} />
+            <Loader2 className="w-16 h-16 animate-spin relative z-10 mx-auto" style={{ color: 'var(--accent)' }} />
+          </div>
+          <div className="text-center relative z-10">
+            <h3 className="text-xl font-bold mb-2 uppercase tracking-wide" style={{ color: 'var(--text-0)' }}>Analyzing Responses...</h3>
+            <p className="text-sm font-medium tracking-wide" style={{ color: 'var(--text-2)' }}>Fetching the next phase of your interview.</p>
+          </div>
+        </div>
+      );
+    }
+
     if (roundStatus === 'summary') {
       return <RoundSummary summary={roundSummaries[roundSummaries.length - 1]} />;
     }
@@ -128,6 +164,13 @@ const InterviewRoom = () => {
       case 'behavioral':
       case 'text':
         return <HRRound questions={roundData?.questions || []} />;
+      case 'aptitude':
+        return (
+          <AptitudeRound
+            questions={roundData?.questions || []}
+            onComplete={handleRoundComplete}
+          />
+        );
       default:
         return (
           <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -150,7 +193,7 @@ const InterviewRoom = () => {
           trackSequence={trackSequence}
           currentRoundNum={currentRoundNum}
           role={session?.target_role || "Software Engineer"}
-          onHome={() => navigate('/dashboard')}
+          onEnd={endInterview}
           aiState="thinking" // Default state for now, can be connected to AI context later
           isRecording={true}
         />
@@ -171,7 +214,9 @@ const InterviewRoom = () => {
              exit={{ opacity: 0, scale: 1.02 }}
              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
            >
-              {renderContent()}
+              <React.Suspense fallback={<RoundLoader />}>
+                {renderContent()}
+              </React.Suspense>
            </motion.div>
          </AnimatePresence>
        </main>

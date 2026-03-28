@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { BookOpen, Bookmark, CheckCircle, Clock, Lock, Search, Filter, ArrowRight, ExternalLink } from 'lucide-react'
 import { sheetsApi } from '../services/api'
+import { useSubscription } from '../hooks/useSubscription'
 
 const CATEGORIES = [
   { id: 'all',            label: 'All Topics',    icon: '✦' },
@@ -26,6 +27,7 @@ export default function Sheets() {
     const [search, setSearch] = useState('')
     const [debouncedSearch, setDebouncedSearch] = useState('')
     const navigate = useNavigate()
+    const { isFree } = useSubscription()
 
     // Fetch once on mount
     useEffect(() => {
@@ -268,12 +270,26 @@ export default function Sheets() {
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0 }}
                                     transition={{ duration: 0.2, delay: idx * 0.02 }}
-                                    onClick={() => navigate(`/sheets/${sheet.slug}`)}
-                                    className="group relative flex flex-col h-full bg-[var(--bg-1)] border border-[var(--border)] rounded-2xl p-6 transition-all duration-300 hover:border-[var(--accent)] hover:shadow-xl hover:shadow-[var(--accent)]/5 hover:-translate-y-1 cursor-pointer"
+                                    onClick={() => {
+                                        if (sheet.is_premium && isFree) {
+                                            navigate('/pricing');
+                                        } else {
+                                            navigate(`/sheets/${sheet.slug}`);
+                                        }
+                                    }}
+                                    className={`group relative flex flex-col h-full bg-[var(--bg-1)] border border-[var(--border)] rounded-2xl p-6 transition-all duration-300 ${sheet.is_premium && isFree ? 'opacity-80' : 'hover:border-[var(--accent)] hover:shadow-xl hover:shadow-[var(--accent)]/5 hover:-translate-y-1 cursor-pointer'}`}
                                 >
+                                    {sheet.is_premium && isFree && (
+                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] rounded-2xl z-20 flex flex-col items-center justify-center text-center p-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Lock className="text-amber-400 mb-3" size={32} />
+                                            <p className="text-white font-bold text-sm mb-2">PRO CONTENT</p>
+                                            <p className="text-white/70 text-xs mb-4">Upgrade to unlock this masterclass cheat sheet.</p>
+                                            <button className="bg-amber-500 text-black px-4 py-2 rounded-lg font-bold text-xs">Upgrade Now</button>
+                                        </div>
+                                    )}
                                     {/* Premium Badge */}
                                     {sheet.is_premium && (
-                                        <div className="absolute top-4 right-4 bg-gradient-to-tr from-amber-500 to-yellow-300 p-1.5 rounded-lg shadow-lg">
+                                        <div className="absolute top-4 right-4 bg-gradient-to-tr from-amber-500 to-yellow-300 p-1.5 rounded-lg shadow-lg z-10">
                                             <Lock size={12} className="text-black" />
                                         </div>
                                     )}

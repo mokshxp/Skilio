@@ -5,7 +5,7 @@ export default function InterviewNavbar({
   trackSequence = [],
   currentRoundNum = 1,
   role = "Software Engineer",
-  onHome,
+  onEnd,
   aiState = "idle", // "listening" | "thinking" | "speaking"
   isRecording = false,
 }) {
@@ -120,13 +120,22 @@ export default function InterviewNavbar({
             {role || "Software Engineer"}
           </div>
 
-          {/* HOME */}
+          {/* END INTERVIEW */}
           <button
-            onClick={onHome}
-            className="p-2 rounded-md hover:scale-105 transition-all text-neutral-400 hover:text-orange-500"
-            style={{ background: 'var(--bg-1)', border: '1px solid var(--border)' }}
+            onClick={() => {
+              if (window.confirm("Are you sure you want to end the interview early? You will be taken straight to your results.")) {
+                onEnd();
+              }
+            }}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all font-bold text-rose-500 hover:bg-rose-500/10 border border-rose-500/20 active:scale-95 group"
           >
-            <Home className="w-4 h-4" />
+            <span className="text-[10px] uppercase tracking-widest sm:block hidden">End Session</span>
+            <div className="w-6 h-6 rounded-lg bg-rose-500 flex items-center justify-center text-white shadow-lg shadow-rose-500/30 group-hover:rotate-12 transition-transform">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                <line x1="12" y1="2" x2="12" y2="12"></line>
+              </svg>
+            </div>
           </button>
         </div>
       </div>

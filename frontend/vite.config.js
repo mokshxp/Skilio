@@ -18,5 +18,18 @@ export default defineConfig({
     build: {
         outDir: '../dist',
         emptyOutDir: true,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    // Separate chunks for better browser caching
+                    'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+                    'vendor-motion': ['framer-motion'],
+                    'vendor-clerk': ['@clerk/clerk-react'],
+                    'vendor-editor': ['@monaco-editor/react'],
+                    'vendor-supabase': ['@supabase/supabase-js'],
+                },
+            },
+        },
+        chunkSizeWarningLimit: 800,
     },
 })

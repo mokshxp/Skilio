@@ -23,10 +23,11 @@ export const ROUND_SEQUENCES = {
     { round: 2, type: "hr",         label: "Competency",     icon: "🎯" },
     { round: 3, type: "hr",         label: "Leadership",     icon: "👑" },
   ],
+  // ✅ Mixed includes Aptitude as Phase 1
   mixed: [
-    { round: 1, type: "mcq",        label: "Core CS",        icon: "🧠" },
-    { round: 2, type: "mcq",        label: "System Design",  icon: "🏗️" },
-    { round: 3, type: "dsa",        label: "DSA Challenge",  icon: "⚡" },
+    { round: 1, type: "aptitude",   label: "Aptitude",       icon: "🔢" },
+    { round: 2, type: "mcq",        label: "Core CS",        icon: "🧠" },
+    { round: 3, type: "mcq",        label: "System Design",  icon: "🏗️" },
     { round: 4, type: "dsa",        label: "Coding Round",   icon: "💻" },
     { round: 5, type: "hr",         label: "Behavioural",    icon: "🤝" },
   ],

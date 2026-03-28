@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Bookmark, CheckCircle, Clock, Lock, Share2, MessageSquare, ChevronRight, Copy, Check } from 'lucide-react'
 import { sheetsApi } from '../services/api'
 import SectionRenderer from '../components/sheets/SectionRenderer'
+import FeatureGate from '../components/subscription/FeatureGate'
+import { useSubscription } from '../hooks/useSubscription'
 
 export default function SheetDetail() {
     const { slug } = useParams()
@@ -118,91 +120,159 @@ export default function SheetDetail() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-12 items-start">
-                
-                {/* Main Content Column */}
-                <article className="min-w-0">
-                    <header className="mb-12">
-                        <div className="flex flex-wrap gap-2 mb-6">
-                            <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]/10">
-                                {sheet.difficulty}
-                            </span>
-                            <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[var(--bg-1)] text-[var(--text-2)] border border-[var(--border)]">
-                                {sheet.estimated_read_time} min read
-                            </span>
-                        </div>
-                        <h1 className="text-4xl sm:text-5xl font-['Outfit'] font-extrabold tracking-tight text-[var(--text-0)] mb-6 leading-[1.15]">
-                            {sheet.title}
-                        </h1>
-                        <p className="text-xl text-[var(--text-1)] leading-relaxed font-medium">
-                            {sheet.description}
-                        </p>
-                    </header>
-
-                    <div className="space-y-12">
-                        {sheet.content?.sections?.map((section, idx) => (
-                            <section key={idx} id={`section-${idx}`} className="scroll-mt-32">
-                                <h2 className="text-2xl font-['Outfit'] font-bold text-[var(--text-0)] mb-5 flex items-center gap-3">
-                                    <span className="text-[var(--accent)] opacity-40 font-mono text-lg">{String(idx + 1).padStart(2, '0')}</span>
-                                    {section.title}
-                                </h2>
-                                <div className="mt-8">
-                                    <SectionRenderer 
-                                        section={section} 
-                                        copyCode={copyCode} 
-                                        copied={copied} 
-                                    />
+                {sheet.is_premium ? (
+                    <FeatureGate 
+                        feature="roundTypes" 
+                        featureName="Masterclass Cheat Sheets"
+                        requiredPlan="Pro"
+                    >
+                        {/* Main Content Column */}
+                        <article className="min-w-0">
+                            <header className="mb-12">
+                                <div className="flex flex-wrap gap-2 mb-6">
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]/10">
+                                        {sheet.difficulty}
+                                    </span>
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[var(--bg-1)] text-[var(--text-2)] border border-[var(--border)]">
+                                        {sheet.estimated_read_time} min read
+                                    </span>
                                 </div>
-                            </section>
-                        ))}
-                    </div>
+                                <h1 className="text-4xl sm:text-5xl font-['Outfit'] font-extrabold tracking-tight text-[var(--text-0)] mb-6 leading-[1.15]">
+                                    {sheet.title}
+                                </h1>
+                                <p className="text-xl text-[var(--text-1)] leading-relaxed font-medium">
+                                    {sheet.description}
+                                </p>
+                            </header>
 
-                    {/* Final CTA */}
-                    <div className="mt-20 p-10 bg-[var(--bg-1)] border border-[var(--border)] rounded-[32px] text-center relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)] opacity-[0.03] blur-[100px] pointer-events-none group-hover:opacity-[0.06] transition-opacity duration-700" />
-                        <h3 className="text-2xl font-['Outfit'] font-bold text-[var(--text-0)] mb-4">Completed this topic?</h3>
-                        <p className="text-[var(--text-2)] mb-8 max-w-[440px] mx-auto font-medium">Ready to test your knowledge in a live interview? Jump into a mock session with AI.</p>
-                        <button 
-                            onClick={() => navigate('/start')}
-                            className="bg-white text-black px-8 py-3.5 rounded-2xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/5"
-                        >
-                            🚀 Start AI Interview
-                        </button>
-                    </div>
-                </article>
+                            <div className="space-y-12">
+                                {sheet.content?.sections?.map((section, idx) => (
+                                    <section key={idx} id={`section-${idx}`} className="scroll-mt-32">
+                                        <h2 className="text-2xl font-['Outfit'] font-bold text-[var(--text-0)] mb-5 flex items-center gap-3">
+                                            <span className="text-[var(--accent)] opacity-40 font-mono text-lg">{String(idx + 1).padStart(2, '0')}</span>
+                                            {section.title}
+                                        </h2>
+                                        <div className="mt-8">
+                                            <SectionRenderer 
+                                                section={section} 
+                                                copyCode={copyCode} 
+                                                copied={copied} 
+                                            />
+                                        </div>
+                                    </section>
+                                ))}
+                            </div>
 
-                {/* Sidebar Navigation */}
-                <aside className="hidden lg:block sticky top-[120px] space-y-8 h-fit max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-hide pr-2">
-                    <div className="bg-[var(--bg-1)] border border-[var(--border)] rounded-2xl p-6">
-                        <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-3)] mb-6 sticky top-0 bg-[var(--bg-1)] pb-4 z-10 border-b border-[var(--border)]">
-                            Table of Contents
-                        </h4>
-                        <nav className="space-y-1">
-                            {sheet.content?.sections?.map((section, idx) => (
-                                <a 
-                                    key={idx} 
-                                    href={`#section-${idx}`}
-                                    className="block py-2.5 text-[13.5px] font-semibold text-[var(--text-1)] hover:text-[var(--accent)] transition-all line-clamp-1 border-l-2 border-transparent pl-4 hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 rounded-r-lg"
+                            {/* Final CTA */}
+                            <div className="mt-20 p-10 bg-[var(--bg-1)] border border-[var(--border)] rounded-[32px] text-center relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)] opacity-[0.03] blur-[100px] pointer-events-none group-hover:opacity-[0.06] transition-opacity duration-700" />
+                                <h3 className="text-2xl font-['Outfit'] font-bold text-[var(--text-0)] mb-4">Completed this topic?</h3>
+                                <p className="text-[var(--text-2)] mb-8 max-w-[440px] mx-auto font-medium">Ready to test your knowledge in a live interview? Jump into a mock session with AI.</p>
+                                <button 
+                                    onClick={() => navigate('/start')}
+                                    className="bg-white text-black px-8 py-3.5 rounded-2xl font-bold text-sm hover:scale-105 active:scale-95 transition-all shadow-xl shadow-white/5"
                                 >
-                                    {section.title}
-                                </a>
-                            ))}
-                        </nav>
-                    </div>
+                                    🚀 Start AI Interview
+                                </button>
+                            </div>
+                        </article>
 
-                    <div className="bg-gradient-to-br from-[var(--bg-1)] to-[var(--bg-0)] border border-[var(--border)] rounded-2xl p-6 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 p-4 opacity-10">
-                            <MessageSquare size={48} className="text-[var(--accent)]" />
-                        </div>
-                        <h4 className="text-sm font-bold text-[var(--text-0)] mb-3 relative z-10">Confused about this?</h4>
-                        <p className="text-xs text-[var(--text-2)] leading-relaxed mb-4 font-medium opacity-80 relative z-10">Our career copilot can explain these concepts in detail and quiz you live.</p>
-                        <button 
-                            onClick={() => navigate('/copilot', { state: { context: `I'd like to discuss the concepts mentioned in the ${sheet.title} sheet.` } })}
-                            className="w-full bg-[var(--bg-3)] hover:bg-[var(--accent)] hover:text-black border border-[var(--border)] py-2.5 rounded-xl text-xs font-bold transition-all relative z-10"
-                        >
-                            Ask Copilot
-                        </button>
-                    </div>
-                </aside>
+                        {/* Sidebar Navigation */}
+                        <aside className="hidden lg:block sticky top-[120px] space-y-8 h-fit max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-hide pr-2">
+                            <div className="bg-[var(--bg-1)] border border(--border)] rounded-2xl p-6">
+                                <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-3)] mb-6 sticky top-0 bg-[var(--bg-1)] pb-4 z-10 border-b border-[var(--border)]">
+                                    Table of Contents
+                                </h4>
+                                <nav className="space-y-1">
+                                    {sheet.content?.sections?.map((section, idx) => (
+                                        <a 
+                                            key={idx} 
+                                            href={`#section-${idx}`}
+                                            className="block py-2.5 text-[13.5px] font-semibold text-[var(--text-1)] hover:text-[var(--accent)] transition-all line-clamp-1 border-l-2 border-transparent pl-4 hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 rounded-r-lg"
+                                        >
+                                            {section.title}
+                                        </a>
+                                    ))}
+                                </nav>
+                            </div>
+
+                            <div className="bg-gradient-to-br from-[var(--bg-1)] to-[var(--bg-0)] border border-[var(--border)] rounded-2xl p-6 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-10">
+                                    <MessageSquare size={48} className="text-[var(--accent)]" />
+                                </div>
+                                <h4 className="text-sm font-bold text-[var(--text-0)] mb-3 relative z-10">Confused about this?</h4>
+                                <p className="text-xs text-[var(--text-2)] leading-relaxed mb-4 font-medium opacity-80 relative z-10">Our career copilot can explain these concepts in detail and quiz you live.</p>
+                                <button 
+                                    onClick={() => navigate('/copilot', { state: { context: `I'd like to discuss the concepts mentioned in the ${sheet.title} sheet.` } })}
+                                    className="w-full bg-[var(--bg-3)] hover:bg-[var(--accent)] hover:text-black border border-[var(--border)] py-2.5 rounded-xl text-xs font-bold transition-all relative z-10"
+                                >
+                                    Ask Copilot
+                                </button>
+                            </div>
+                        </aside>
+                    </FeatureGate>
+                ) : (
+                   /* FREE CONTENT - RENDER DIRECTLY */
+                   <>
+                        {/* Main Content Column */}
+                        <article className="min-w-0">
+                            <header className="mb-12">
+                                <div className="flex flex-wrap gap-2 mb-6">
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[var(--accent-dim)] text-[var(--accent)] border border-[var(--accent)]/10">
+                                        {sheet.difficulty}
+                                    </span>
+                                    <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest bg-[var(--bg-1)] text-[var(--text-2)] border border-[var(--border)]">
+                                        {sheet.estimated_read_time} min read
+                                    </span>
+                                </div>
+                                <h1 className="text-4xl sm:text-5xl font-['Outfit'] font-extrabold tracking-tight text-[var(--text-0)] mb-6 leading-[1.15]">
+                                    {sheet.title}
+                                </h1>
+                                <p className="text-xl text-[var(--text-1)] leading-relaxed font-medium">
+                                    {sheet.description}
+                                </p>
+                            </header>
+
+                            <div className="space-y-12">
+                                {sheet.content?.sections?.map((section, idx) => (
+                                    <section key={idx} id={`section-${idx}`} className="scroll-mt-32">
+                                        <h2 className="text-2xl font-['Outfit'] font-bold text-[var(--text-0)] mb-5 flex items-center gap-3">
+                                            <span className="text-[var(--accent)] opacity-40 font-mono text-lg">{String(idx + 1).padStart(2, '0')}</span>
+                                            {section.title}
+                                        </h2>
+                                        <div className="mt-8">
+                                            <SectionRenderer 
+                                                section={section} 
+                                                copyCode={copyCode} 
+                                                copied={copied} 
+                                            />
+                                        </div>
+                                    </section>
+                                ))}
+                            </div>
+                        </article>
+
+                        {/* Sidebar Navigation */}
+                        <aside className="hidden lg:block sticky top-[120px] space-y-8 h-fit max-h-[calc(100vh-160px)] overflow-y-auto scrollbar-hide pr-2">
+                            <div className="bg-[var(--bg-1)] border border-[var(--border)] rounded-2xl p-6">
+                                <h4 className="text-[11px] font-bold uppercase tracking-[0.2em] text-[var(--text-3)] mb-6 sticky top-0 bg-[var(--bg-1)] pb-4 z-10 border-b border-[var(--border)]">
+                                    Table of Contents
+                                </h4>
+                                <nav className="space-y-1">
+                                    {sheet.content?.sections?.map((section, idx) => (
+                                        <a 
+                                            key={idx} 
+                                            href={`#section-${idx}`}
+                                            className="block py-2.5 text-[13.5px] font-semibold text-[var(--text-1)] hover:text-[var(--accent)] transition-all line-clamp-1 border-l-2 border-transparent pl-4 hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 rounded-r-lg"
+                                        >
+                                            {section.title}
+                                        </a>
+                                    ))}
+                                </nav>
+                            </div>
+                        </aside>
+                   </>
+                )}
             </div>
         </div>
     )

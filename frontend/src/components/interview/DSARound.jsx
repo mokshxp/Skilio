@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import Editor from '@monaco-editor/react';
+const Editor = React.lazy(() => import('@monaco-editor/react'));
 import useInterviewStore from '../../store/interviewStore';
 import { 
   Play, 
@@ -319,29 +318,36 @@ const DSARound = ({ questions = [] }) => {
 
         {/* Editor Core */}
         <div className="flex-1 min-h-0 bg-[#0A0B10]">
-          <Editor
-            height="100%"
-            theme={editorTheme}
-            language={dsaLanguage === 'cpp' ? 'cpp' : (dsaLanguage === 'python' ? 'python' : (dsaLanguage === 'java' ? 'java' : 'javascript'))}
-            value={dsaCode[dsaLanguage] || ""}
-            onChange={(val) => updateDSACode(dsaLanguage, val)}
-            options={{
-              fontSize: 15,
-              fontFamily: 'Fira Code, monospace',
-              fontWeight: '500',
-              minimap: { enabled: false },
-              padding: { top: 40, bottom: 40 },
-              smoothScrolling: true,
-              cursorBlinking: 'smooth',
-              cursorStyle: 'block',
-              lineHeight: 1.8,
-              renderLineHighlight: 'all',
-              scrollBeyondLastLine: false,
-              backgroundColor: '#0A0B10',
-              letterSpacing: 0.5,
-              scrollbar: { verticalWidth: 4, horizontalHeight: 4 }
-            }}
-          />
+          <React.Suspense fallback={
+            <div className="h-full flex flex-col items-center justify-center gap-4 text-neutral-600 font-mono text-[10px] tracking-[0.2em] uppercase">
+              <div className="w-6 h-6 border-2 border-[var(--bg-3)] border-t-[var(--accent)] rounded-full animate-spin" />
+              Initializing IDE...
+            </div>
+          }>
+            <Editor
+              height="100%"
+              theme={editorTheme}
+              language={dsaLanguage === 'cpp' ? 'cpp' : (dsaLanguage === 'python' ? 'python' : (dsaLanguage === 'java' ? 'java' : 'javascript'))}
+              value={dsaCode[dsaLanguage] || ""}
+              onChange={(val) => updateDSACode(dsaLanguage, val)}
+              options={{
+                fontSize: 15,
+                fontFamily: 'Fira Code, monospace',
+                fontWeight: '500',
+                minimap: { enabled: false },
+                padding: { top: 40, bottom: 40 },
+                smoothScrolling: true,
+                cursorBlinking: 'smooth',
+                cursorStyle: 'block',
+                lineHeight: 1.8,
+                renderLineHighlight: 'all',
+                scrollBeyondLastLine: false,
+                backgroundColor: '#0A0B10',
+                letterSpacing: 0.5,
+                scrollbar: { verticalWidth: 4, horizontalHeight: 4 }
+              }}
+            />
+          </React.Suspense>
         </div>
 
         {/* Console Drawer */}
