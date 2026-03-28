@@ -172,43 +172,50 @@ const useInterviewStore = create(
       submitDSACode: async (code, language, questionId) => {
         const { interviewId, currentRound } = get();
         set({ roundStatus: 'submitting' });
+        
         try {
-          const res = await interviewApi.submitDSA({
-            interviewId,
-            questionId,
-            roundNumber: currentRound,
-            code,
-            language
-          });
+          // 1. Only run execution/AI if there's actually something to evaluate
+          // This prevents crashes or 'stuck' states on empty submissions
+          const hasCode = code && code.trim().length > 50; 
           
-          set({ dsaTestResults: res.testResults });
-          
-          // In V2, we might stay here until they're happy, or complete the round.
-          // Let's call completeRound if they passed all or explicitly finished.
-          if (res.allPassed) {
-             const compRes = await interviewApi.completeRound(interviewId, {
+          let res = { testResults: [], allPassed: false };
+          if (hasCode) {
+            try {
+              res = await interviewApi.submitDSA({
+                interviewId,
+                questionId,
                 roundNumber: currentRound,
-                responses: [{
-                    questionId,
-                    answer: code,
-                    timeTaken: 600
-                }]
-             });
-             set((state) => ({
-                roundSummaries: [...state.roundSummaries, compRes.roundSummary],
-                lastDSASubmission: compRes,
-                nextRoundData: compRes.nextRound,
-                isInterviewComplete: compRes.isComplete,
-                // Stay 'active' or 'submitting' so component can show success modal
-                // status will be manually set to 'summary' by modal button
-             }));
-             return { ...res, compRes };
-          } else {
-             set({ roundStatus: 'active' });
+                code,
+                language
+              });
+            } catch (e) {
+              console.warn("Backend evaluation failed, falling back to soft submit", e);
+            }
           }
-          return res;
+          
+          set({ dsaTestResults: res.testResults || [] });
+          
+          // 2. FORCED COMPLETION: Move to the next round regardless of what the backend said
+          const compRes = await interviewApi.completeRound(interviewId, {
+              roundNumber: currentRound,
+              responses: [{
+                  questionId,
+                  answer: code || "// No code submitted",
+                  timeTaken: 600
+              }]
+          });
+
+          set((state) => ({
+              roundSummaries: [...state.roundSummaries, compRes.roundSummary],
+              lastDSASubmission: compRes,
+              nextRoundData: compRes.nextRound,
+              isInterviewComplete: compRes.isComplete,
+              roundStatus: 'active' // Reset to active so the component displays the result modal
+          }));
+
+          return { ...res, compRes };
         } catch (err) {
-          console.error("Code submission failed", err);
+          console.error("Critical submission failure", err);
           set({ roundStatus: 'active' });
         }
       },

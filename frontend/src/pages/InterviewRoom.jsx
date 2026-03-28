@@ -10,6 +10,7 @@ import DSARound from '../components/interview/DSARound';
 import HRRound from '../components/interview/HRRound';
 import RoundSummary from '../components/interview/RoundSummary';
 import FinalReport from '../components/interview/FinalReport';
+import InterviewNavbar from '../components/interview/InterviewNavbar';
 
 import { Loader2, AlertCircle, Home, RefreshCcw, CheckCircle } from 'lucide-react';
 import { ROUND_SEQUENCES } from '../config/roundConfig';
@@ -145,60 +146,14 @@ const InterviewRoom = () => {
     <div className="min-h-screen w-full flex flex-col" style={{ background: 'var(--bg-0)' }}>
       {/* Dynamic Progress Header */}
       {!isInterviewComplete && roundStatus !== 'complete' && (
-        <div className="w-full border-b sticky top-0 z-50 backdrop-blur-md" style={{ background: 'var(--bg-0)cc', borderColor: 'var(--border)' }}>
-          <div className="max-w-7xl mx-auto px-8 h-20 flex items-center justify-between">
-             <div className="flex items-center gap-12">
-               <div className="flex items-center gap-3">
-                 <div style={{
-                     width: 28, height: 28, borderRadius: 8,
-                     background: 'linear-gradient(135deg, #C4501A, #ff8c00)',
-                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                     fontSize: 14, fontWeight: 900, color: '#fff',
-                 }}>S</div>
-                 <span className="font-extrabold tracking-tighter text-xl uppercase italic">Skilio</span>
-               </div>
-
-               <div className="round-progress">
-                  {trackSequence.map((r, i) => {
-                    const isPast = r.round < currentRoundNum;
-                    const isActive = r.round === currentRoundNum;
-                    return (
-                      <div key={r.round} className="flex items-center gap-3">
-                        <div 
-                           className={`round-pip ${isActive ? 'active' : ''} ${isPast ? 'done' : ''}`}
-                           title={r.label}
-                        >
-                           {isPast ? <CheckCircle className="w-4 h-4" /> : <span>{r.icon}</span>}
-                        </div>
-                        {isActive && (
-                          <div className="flex flex-col -gap-1">
-                             <span className="text-[10px] font-black uppercase tracking-widest opacity-50">Current Round</span>
-                             <span className="text-xs font-bold whitespace-nowrap">{r.label}</span>
-                          </div>
-                        )}
-                        {i < trackSequence.length - 1 && (
-                          <div className="w-4 h-[1.5px]" style={{ background: 'var(--border)' }} />
-                        )}
-                      </div>
-                    );
-                  })}
-               </div>
-             </div>
-
-             <div className="flex items-center gap-4">
-                <div className="px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border" style={{ color: 'var(--text-1)', borderColor: 'var(--border)' }}>
-                  {session?.target_role || "Software Engineer"}
-                </div>
-                <button 
-                  onClick={() => navigate('/dashboard')}
-                  className="p-2 hover:bg-neutral-800 rounded-lg transition-colors"
-                  style={{ color: 'var(--text-2)' }}
-                >
-                  <Home className="w-5 h-5" />
-                </button>
-             </div>
-          </div>
-        </div>
+        <InterviewNavbar 
+          trackSequence={trackSequence}
+          currentRoundNum={currentRoundNum}
+          role={session?.target_role || "Software Engineer"}
+          onHome={() => navigate('/dashboard')}
+          aiState="thinking" // Default state for now, can be connected to AI context later
+          isRecording={true}
+        />
       )}
 
       {/* Global Background Elements */}

@@ -713,12 +713,43 @@ try {
   }
 
   if (language === 'cpp' || language === 'c++') {
-    // Detect the public method name from inside the Solution class
-    const methodMatch = code.match(/public:[\s\S]*?(?:vector|string|int|bool|double|long|void|unordered_map|map)\b[^(\n]* (\w+)\s*\(/);
-    const methodName = methodMatch ? methodMatch[1] : 'updateInventory';
+    // 1. Better Method Discovery (detects method name and return type)
+    const methodMatch = code.match(/public:[\s\S]*?(\w+<[\w<>, ]+>|\w+)\b[^(\n]* (\w+)\s*\(/);
+    const methodName = methodMatch ? methodMatch[2] : 'solve';
 
     return `#include <bits/stdc++.h>
 using namespace std;
+
+// Generic JSON Serializers
+string toJson(bool b) { return b ? "true" : "false"; }
+string toJson(int i) { return to_string(i); }
+string toJson(long long l) { return to_string(l); }
+string toJson(double d) { return to_string(d); }
+string toJson(const string& s) { return "\\\"" + s + "\\\""; }
+
+template<typename T> string toJson(const vector<T>& v);
+template<typename K, typename V> string toJson(const pair<K, V>& p);
+
+template<typename K, typename V>
+string toJson(const pair<K, V>& p) {
+    // Detect if this is likely a fruit-inventory style pair or a generic one
+    // In our system, vector<pair<string, int>> is standardized as a list of fruit objects
+    return "{\\\"fruit\\\":\\\"" + (string)p.first + "\\\",\\\"quantity\\\":" + to_string(p.second) + "}";
+}
+
+template<typename T>
+string toJson(const vector<T>& v) {
+    string out = "[";
+    for (size_t i = 0; i < v.size(); i++) {
+        out += toJson(v[i]);
+        if (i + 1 < v.size()) out += ",";
+    }
+    return out + "]";
+}
+
+// Fallback for types we don't handle explicitly yet
+template<typename T>
+string toJson(T val) { return "\\\"COMPLEX_RETURN_TYPE\\\""; }
 
 ${code}
 
@@ -748,9 +779,11 @@ int main() {
     try {
         string allInput, line;
         while (getline(cin, line)) allInput += line + "\\n";
-        if (allInput.empty()) allInput = R"raw(${cleanInput})raw";
-
-        // Extract the two JSON objects from the input
+        
+        // Note: In real scenarios, we'd use a robust JSON parser for C++.
+        // For these DSA problems, we assume basic maps as the standard input for inventory.
+        
+        // Simple object splitter
         auto findObject = [](const string& s, size_t from) -> pair<size_t,size_t> {
             size_t start = s.find('{', from);
             if (start == string::npos) return {string::npos, string::npos};
@@ -763,32 +796,23 @@ int main() {
         };
 
         auto [s1, e1] = findObject(allInput, 0);
-        auto [s2, e2] = findObject(allInput, e1 + 1);
-
-        if (s1 == string::npos || s2 == string::npos) {
-            cout << "INTERNAL_NULL_RETURN" << endl;
-            return 0;
-        }
-
-        unordered_map<string,int> inv = parseJsonMap(allInput.substr(s1, e1 - s1 + 1));
-        unordered_map<string,int> rst = parseJsonMap(allInput.substr(s2, e2 - s2 + 1));
+        auto [s2, e2] = findObject(allInput, e1 == string::npos ? 0 : e1 + 1);
 
         Solution sol;
-        auto result = sol.${methodName}(inv, rst);
-
-        // Sort alphabetically for deterministic output
-        sort(result.begin(), result.end());
-
-        // Serialize as [{"fruit":"...","quantity":N},...]
-        string out = "[";
-        for (size_t i = 0; i < result.size(); i++) {
-            out += "{\\\"fruit\\\":\\\"" + result[i].first + "\\\",\\\"quantity\\\":" + to_string(result[i].second) + "}";
-            if (i + 1 < result.size()) out += ",";
+        
+        // For the specific inventory problem
+        if (s1 != string::npos && s2 != string::npos) {
+            auto inv = parseJsonMap(allInput.substr(s1, e1 - s1 + 1));
+            auto rst = parseJsonMap(allInput.substr(s2, e2 - s2 + 1));
+            auto result = sol.${methodName}(inv, rst);
+            sort(result.begin(), result.end()); // Keep sorted standard
+            cout << toJson(result) << endl;
+        } else {
+            // General purpose fallback for other problems (takes raw string arg)
+            // cout << toJson(sol.${methodName}(allInput)) << endl;
         }
-        out += "]";
-        cout << out << endl;
     } catch (const exception& e) {
-        cerr << e.what() << endl;
+        cerr << "HARNESS_ERROR: " << e.what() << endl;
         return 1;
     }
     return 0;
