@@ -1,3 +1,4 @@
+import React, { useState, useEffect, useRef } from 'react';
 const Editor = React.lazy(() => import('@monaco-editor/react'));
 import useInterviewStore from '../../store/interviewStore';
 import { 

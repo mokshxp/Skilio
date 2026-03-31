@@ -3,6 +3,7 @@ const {
   generateDSAProblemBatch, 
   generateHRBatch 
 } = require("./ai");
+const { generateAptitudeQuestions } = require("./aptitudeGenerator");
 const supabase = require("../config/db");
 
 async function preGenerateRemainingRounds({
@@ -13,6 +14,9 @@ async function preGenerateRemainingRounds({
   difficulty,
   resumeContext,
 }) {
+  // ✅ Wait 10 seconds before pre-generating — let NVIDIA recover from aptitude load
+  await new Promise(r => setTimeout(r, 10000));
+
   for (let i = startFromIndex; i < sequence.length; i++) {
     const roundStep = sequence[i];
     const roundNumber = roundStep.round;
@@ -39,8 +43,11 @@ async function preGenerateRemainingRounds({
           targetRole: role,
           experienceYears: resumeContext?.experience || 0
         });
+      } else if (roundStep.type === 'aptitude') {
+        roundTypeToSave = 'aptitude';
+        nextRoundQuestions = await generateAptitudeQuestions(roundStep.difficulty || difficulty);
       } else {
-        roundTypeToSave = roundStep.type === 'aptitude' ? 'aptitude' : 'mcq';
+        roundTypeToSave = 'mcq';
         nextRoundQuestions = await generateMCQBatch({
           targetRole: role,
           difficulty: roundStep.difficulty || difficulty,
@@ -134,6 +141,11 @@ async function preGenerateRemainingRounds({
         .eq("round_number", roundNumber);
 
       console.error(`❌ Pre-generation failed for Round ${roundNumber}:`, err.message);
+    }
+
+    // ✅ Gap between each round pre-generation to avoid rate limiting
+    if (i < sequence.length - 1) {
+      await new Promise(r => setTimeout(r, 3000));
     }
   }
 }

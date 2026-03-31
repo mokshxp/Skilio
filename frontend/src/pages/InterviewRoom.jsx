@@ -11,10 +11,9 @@ const HRRound = React.lazy(() => import('../components/interview/HRRound'));
 const AptitudeRound = React.lazy(() => import('../components/rounds/AptitudeRound'));
 
 import RoundSummary from '../components/interview/RoundSummary';
-import FinalReport from '../components/interview/FinalReport';
 import InterviewNavbar from '../components/interview/InterviewNavbar';
 
-import { Loader2, AlertCircle, Home, RefreshCcw, CheckCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Home, RefreshCcw } from 'lucide-react';
 import { ROUND_SEQUENCES } from '../config/roundConfig';
 
 const InterviewRoom = () => {
@@ -33,25 +32,19 @@ const InterviewRoom = () => {
     endInterview
   } = useInterviewStore();
 
-  const handleRoundComplete = async (answers) => {
-    await completeAptitudeRound(answers);
-  };
-
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // ✅ Hook 1 — fetch session
   useEffect(() => {
     const fetchSession = async () => {
       try {
         setIsLoading(true);
-        // Fetching from confirmed backend route: /interview/session/:id
         const data = await interviewApi.get(interviewId); 
         
         const currentRoundNum = Number(data.current_round);
         const currentRoundQs = (data.interview_questions || []).filter(q => Number(q.round_number) === currentRoundNum);
         
-        // Derive the round type from the authoritative round config sequence,
-        // not from question_type which can be stale/incorrect.
         const { getSequence } = await import('../config/roundConfig.js');
         const trackName = (data.round_type || data.type || 'mixed').toLowerCase();
         const targetRole = data.target_role || '';
@@ -84,6 +77,19 @@ const InterviewRoom = () => {
     }
   }, [interviewId, initSession]);
 
+  // ✅ Hook 2 — navigate when complete (MUST be before any early returns)
+  useEffect(() => {
+    if ((roundStatus === 'complete' || isInterviewComplete) && interviewId) {
+      navigate(`/results/${interviewId}`);
+    }
+  }, [roundStatus, isInterviewComplete, interviewId, navigate]);
+
+  // ✅ Handler — defined before early returns
+  const handleRoundComplete = async (answers) => {
+    await completeAptitudeRound(answers);
+  };
+
+  // ✅ Now safe to do early returns — all hooks already called above
   if (isLoading) {
     return (
       <div className="h-screen w-full flex flex-col items-center justify-center gap-4" style={{ background: 'var(--bg-0)' }}>
@@ -146,10 +152,14 @@ const InterviewRoom = () => {
     }
 
     if (roundStatus === 'complete' || isInterviewComplete) {
-      return <FinalReport roundSummaries={roundSummaries} session={session} />;
+      return (
+        <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-4">
+          <Loader2 className="w-12 h-12 animate-spin" style={{ color: 'var(--accent)' }} />
+          <p className="font-bold uppercase tracking-widest text-xs" style={{ color: 'var(--text-2)' }}>Generating Final Analytics...</p>
+        </div>
+      );
     }
 
-    // Normalize round type and handle aliases
     const type = roundType?.toLowerCase().trim();
 
     switch (type) {
@@ -187,19 +197,17 @@ const InterviewRoom = () => {
 
   return (
     <div className="min-h-screen w-full flex flex-col" style={{ background: 'var(--bg-0)' }}>
-      {/* Dynamic Progress Header */}
       {!isInterviewComplete && roundStatus !== 'complete' && (
         <InterviewNavbar 
           trackSequence={trackSequence}
           currentRoundNum={currentRoundNum}
           role={session?.target_role || "Software Engineer"}
           onEnd={endInterview}
-          aiState="thinking" // Default state for now, can be connected to AI context later
+          aiState="thinking"
           isRecording={true}
         />
       )}
 
-      {/* Global Background Elements */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
           <div className="absolute top-0 left-1/4 w-[500px] h-[500px] blur-[120px] rounded-full opacity-5" style={{ background: 'var(--accent)' }} />
           <div className="absolute bottom-0 right-1/4 w-[500px] h-[500px] blur-[120px] rounded-full opacity-5" style={{ background: 'var(--accent)' }} />

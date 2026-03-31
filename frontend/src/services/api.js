@@ -5,7 +5,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || ''
 // Create base instance
 const api = axios.create({
     baseURL: BASE_URL,
-    timeout: 120000,
+    timeout: 300000, // 5 minutes — aptitude generation takes time
     withCredentials: true
 })
 

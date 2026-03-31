@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { useUser } from '@clerk/clerk-react'
 import PageWrapper, { FadeUp } from '../components/layout/PageWrapper.jsx'
 import { resultsApi } from '../services/api.js'
 
@@ -12,6 +13,7 @@ const SUBJECT_ICONS = {
 export default function Results() {
     const { id } = useParams()
     const navigate = useNavigate()
+    const { user } = useUser()
     const [data, setData] = useState(null)
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -30,19 +32,44 @@ export default function Results() {
     const score = data.total_score ?? 0
     const rounds = data.rounds ?? []
     const weakTopics = data.weak_topics ?? []
-    const aiSummary = data.ai_feedback_summary ?? ''
-    const questions = data.questions ?? []
-    const scoreColor = score >= 75 ? 'var(--emerald)' : score >= 50 ? 'var(--amber)' : 'var(--rose)'
+    const aiSummary = data.overall_feedback || data.ai_summary || ""
+    const questions = data.interview_questions || []
+    const ROUND_SEQUENCES_MIXED = [
+        { round_type: 'aptitude',   label: '🔢 Aptitude' },
+        { round_type: 'mcq',        label: '🧠 Core CS' },
+        { round_type: 'mcq_system', label: '🏗️ System Design' },
+        { round_type: 'dsa',        label: '💻 Coding' },
+        { round_type: 'hr',         label: '🤝 Behavioural' },
+    ];
 
-    const correct = questions.filter(q => q.isCorrect).length
-    const wrong = questions.filter(q => q.isCorrect === false).length
+    // Normalize rounds — fill missing with 0 score
+    const normalizedRounds = ROUND_SEQUENCES_MIXED.map((seq, i) => {
+        const existing = rounds.find(r => r.round_type?.toLowerCase() === seq.round_type.toLowerCase() || r.round_number === i + 1);
+        if (existing) return existing;
+        return {
+            ...seq,
+            score: 0,
+            question_count: 0,
+            feedback: 'Round not completed',
+            round_number: i + 1,
+        };
+    });
+
+    const scoreColor = score >= 75 ? 'var(--emerald)' : score >= 50 ? 'var(--amber)' : 'var(--rose)';
+    const correct = questions.filter(q => q.is_correct).length;
+    const wrong = questions.length - correct;
 
     return (
         <PageWrapper>
             <FadeUp>
                 <div className="page-header">
-                    <p className="label mb-1">Session #{id?.slice(0, 8)}</p>
-                    <h1 className="headline text-3xl">Interview Results</h1>
+                    <p className="label mb-1">
+                        {user?.firstName ? `${user.firstName}'s Results` : 'Your Results'}
+                    </p>
+                    <h1 className="headline text-3xl">Interview Complete</h1>
+                    <p className="text-sm mt-1" style={{ color: 'var(--text-2)' }}>
+                        {data?.role} · {data?.difficulty} · {data?.created_at ? new Date(data.created_at).toLocaleDateString() : 'N/A'}
+                    </p>
                 </div>
             </FadeUp>
 
@@ -104,16 +131,14 @@ export default function Results() {
             </FadeUp>
 
             {/* Round Breakdown */}
-            {rounds.length > 0 && (
-                <FadeUp>
-                    <div>
-                        <p className="section-label mb-4">Round Breakdown</p>
-                        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {rounds.map((r, i) => <RoundCard key={i} round={r} index={i} />)}
-                        </div>
+            <FadeUp>
+                <div>
+                    <p className="section-label mb-4">Round Breakdown</p>
+                    <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {normalizedRounds.map((r, i) => <RoundCard key={i} round={r} index={i} />)}
                     </div>
-                </FadeUp>
-            )}
+                </div>
+            </FadeUp>
 
             {/* Per-Question Breakdown */}
             {questions.length > 0 && (
@@ -217,9 +242,19 @@ function QuestionResultCard({ q, index }) {
                     {/* MCQ answer */}
                     {q.options && q.correctAnswer && (
                         <div className="flex gap-4 mb-2 text-xs" style={{ fontFamily: 'Fira Code, monospace' }}>
-                            <span style={{ color: 'var(--text-2)' }}>Answer: <span style={{ color: q.isCorrect ? 'var(--emerald)' : 'var(--rose)' }}>{q.answer}</span></span>
+                            <span style={{ color: 'var(--text-2)' }}>
+                                Your answer:{' '}
+                                <span style={{ color: q.isCorrect ? 'var(--emerald)' : 'var(--rose)' }}>
+                                    {(q.answer || '').toUpperCase()}
+                                </span>
+                            </span>
                             {!q.isCorrect && (
-                                <span style={{ color: 'var(--text-2)' }}>Correct: <span style={{ color: 'var(--emerald)' }}>{q.correctAnswer}</span></span>
+                                <span style={{ color: 'var(--text-2)' }}>
+                                    Correct:{' '}
+                                    <span style={{ color: 'var(--emerald)' }}>
+                                        {(q.correctAnswer || '').toUpperCase()}
+                                    </span>
+                                </span>
                             )}
                         </div>
                     )}
@@ -264,39 +299,75 @@ function StatBadge({ label, value, color }) {
     )
 }
 
+const ROUND_LABELS = {
+  aptitude:   '🔢 Aptitude',
+  mcq:        '🧠 Core CS',
+  mcq_core:   '🧠 Core CS',
+  mcq_system: '🏗️ System Design',
+  dsa:        '💻 Coding',
+  hr:         '🤝 Behavioural',
+  behavioral: '🤝 Behavioural',
+  behavioural:'🤝 Behavioural',
+};
+
 function RoundCard({ round, index }) {
-    const score = round.score ?? 0
-    const color = score >= 75 ? 'var(--emerald)' : score >= 50 ? 'var(--amber)' : 'var(--rose)'
-    return (
+  const score = round.score ?? 0;
+  const color = score >= 75 ? 'var(--emerald)' : score >= 50 ? 'var(--amber)' : 'var(--rose)';
+  
+  // ✅ Use label map with fallback
+  const label = ROUND_LABELS[round.round_type?.toLowerCase()] 
+             || round.label 
+             || `Round ${index + 1}`;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.1 }}
+      className="card-hover"
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-widest mb-1"
+             style={{ color: 'var(--text-2)', fontFamily: 'Fira Code, monospace' }}>
+            Round {index + 1}
+          </p>
+          <p className="font-bold text-sm"
+             style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--text-0)' }}>
+            {label}
+          </p>
+          <p className="text-xs" style={{ color: 'var(--text-2)' }}>
+            {round.question_count || round.questions_count || 0} questions
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <span className="text-2xl font-bold"
+                style={{ fontFamily: 'Outfit, sans-serif', color }}>
+            {score}
+          </span>
+          <span className="text-xs" style={{ color: 'var(--text-2)' }}>/ 100</span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="progress-track">
         <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-            className="card-hover"
-        >
-            <div className="flex items-center justify-between mb-3">
-                <div>
-                    <p className="font-bold text-sm" style={{ fontFamily: 'Outfit, sans-serif', color: 'var(--text-0)' }}>
-                        {round.round_type || `Round ${index + 1}`}
-                    </p>
-                    <p className="text-xs" style={{ color: 'var(--text-2)' }}>{round.question_count || 0} questions</p>
-                </div>
-                <span className="text-2xl font-bold" style={{ fontFamily: 'Outfit, sans-serif', color }}>{score}</span>
-            </div>
-            <div className="progress-track">
-                <motion.div
-                    className="h-full rounded-full"
-                    style={{ background: color }}
-                    initial={{ width: 0 }}
-                    animate={{ width: `${score}%` }}
-                    transition={{ duration: 1, delay: 0.3 + index * 0.1 }}
-                />
-            </div>
-            {round.feedback && (
-                <p className="text-xs mt-2 leading-relaxed" style={{ color: 'var(--text-2)' }}>{round.feedback}</p>
-            )}
-        </motion.div>
-    )
+          className="h-full rounded-full"
+          style={{ background: color }}
+          initial={{ width: 0 }}
+          animate={{ width: `${score}%` }}
+          transition={{ duration: 1, delay: 0.3 + index * 0.1 }}
+        />
+      </div>
+
+      {round.feedback && (
+        <p className="text-xs mt-2 leading-relaxed"
+           style={{ color: 'var(--text-2)' }}>
+          {round.feedback}
+        </p>
+      )}
+    </motion.div>
+  );
 }
 
 function LoadingState() {

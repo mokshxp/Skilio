@@ -376,7 +376,7 @@ const useInterviewStore = create(
         });
       }
     }),
-    { name: 'skilio-interview-session' }
+    { name: 'skilio-interview-flow' }
   )
 )
 

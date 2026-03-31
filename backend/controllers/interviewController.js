@@ -6,6 +6,7 @@ const {
   evaluateHRAnswer,
   evaluateCode
 } = require("../services/ai");
+const { generateAptitudeQuestions } = require("../services/aptitudeGenerator");
 const supabase = require("../config/db");
 const { apiLogger, securityLogger } = require("../services/logger");
 const subscriptionService = require("../services/subscriptionService");
@@ -63,7 +64,7 @@ function sanitizeQuestion(aiQuestion, roundNumber, defaultDifficulty = 'intermed
     topic: aiQuestion.topic || aiQuestion.subject || 'General',
     difficulty: (aiQuestion.difficulty || defaultDifficulty).toLowerCase().trim(),
     options: aiQuestion.options || {},
-    correct_answer: aiQuestion.correctAnswer || aiQuestion.correct_answer || (isCoding ? null : 'A'),
+    correct_answer: aiQuestion.correctAnswer || aiQuestion.correct_answer || aiQuestion.correct || (isCoding ? null : 'A'),
     explanation: aiQuestion.explanation || aiQuestion.explanation_text || ''
   };
 
@@ -225,7 +226,9 @@ exports.startInterview = async (req, res) => {
     log('7. Generating questions via AI...', { firstRoundType: firstRound.type });
     let questions;
     try {
-      if (firstRound.type === 'mcq' || firstRound.type === 'technical' || firstRound.type === 'aptitude') {
+      if (firstRound.type === 'aptitude') {
+        questions = await generateAptitudeQuestions(firstRound.difficulty || difficulty);
+      } else if (firstRound.type === 'mcq' || firstRound.type === 'technical') {
         questions = await generateMCQBatch({
           targetRole,
           skills: resumeData?.skills || [],
@@ -390,7 +393,12 @@ exports.completeRound = async (req, res) => {
     if (qFetchError) throw qFetchError;
 
     const questionMap = (qData || []).reduce((acc, q) => {
-      acc[q.id] = { correct: q.correct_answer, options: q.options };
+      // Normalize correct answer from ALL possible field names (AI variations)
+      const correctVal = (q.correct_answer || q.correctAnswer || q.correct || "").toString().trim().toUpperCase();
+      acc[q.id] = { 
+        correct: correctVal, 
+        options: q.options || {} 
+      };
       return acc;
     }, {});
 
@@ -400,35 +408,42 @@ exports.completeRound = async (req, res) => {
       const qInfo = questionMap[r.questionId];
       if (!qInfo) return null; // Should not happen
 
-      const dbCorrectValue = String(qInfo.correct || '').trim();
+      const dbCorrectValue = qInfo.correct;
       const userSelected = String(r.selectedOption || r.answer || '').trim();
       
       // Verification logic:
-      // Case 1: Direct match (e.g. "A" === "A" or "Paris" === "Paris")
-      let isCorrect = (dbCorrectValue.toUpperCase() === userSelected.toUpperCase());
+      // Case 1: Direct match (e.g. "A" === "A" or "Paris" === "Paris") 
+      // Normalize both sides to avoid case mismatch (a vs A)
+      const corStr = dbCorrectValue;
+      const selStr = userSelected.toUpperCase();
+      let isCorrect = (corStr === selStr);
 
-      // Case 2: User sent key (A), but DB has value ("Paris")
+      // Case 2: User sent key (a), but DB has value ("Paris") or keys are case-mismatched
       if (!isCorrect && qInfo.options) {
-          const valFromOption = String(qInfo.options[userSelected] || '').trim();
-          if (valFromOption && valFromOption.toUpperCase() === dbCorrectValue.toUpperCase()) {
+          // Check if userSelected key exists in options (case insensitive)
+          const optionKey = Object.keys(qInfo.options).find(k => k.toUpperCase() === selStr);
+          if (optionKey) {
+            const valFromOption = String(qInfo.options[optionKey] || "").trim().toUpperCase();
+            if (valFromOption === corStr) {
               isCorrect = true;
+            }
           }
       }
 
       // Case 3: User sent value ("Paris"), but DB has key (A)
       if (!isCorrect && qInfo.options) {
-          // Find key for the value
+          // Find if any option value matches the user's selection
           const keyForValue = Object.keys(qInfo.options).find(k => 
-              String(qInfo.options[k] || '').trim().toUpperCase() === userSelected.toUpperCase()
+              String(qInfo.options[k] || '').trim().toUpperCase() === selStr
           );
-          if (keyForValue && keyForValue.toUpperCase() === dbCorrectValue.toUpperCase()) {
+          if (keyForValue && keyForValue.toUpperCase() === corStr) {
               isCorrect = true;
           }
       }
       
       if (isCorrect) correctCount++;
       
-      console.log(`- Q: ${r.questionId} Found: ${dbCorrectValue} User: ${userSelected} Result: ${isCorrect}`);
+      console.log(`- Q: ${r.questionId} Found: ${dbCorrectValue} User: ${userSelected} Result: ${isCorrect} | corStr: ${corStr} selStr: ${selStr}`);
 
       return {
         interview_id: interviewId,

@@ -42,18 +42,22 @@ const AptitudeRound = ({ questions = [], onComplete }) => {
 
   const handleSelect = (option) => {
     if (selected) return;
-    selectMCQAnswer(currentQ.id, option);
+    selectMCQAnswer(currentQ.id, option.toUpperCase());
   };
 
   const handleComplete = () => {
     if (onComplete) {
       // Format the answers to match what completeAptitudeRound expects
-      const formattedAnswers = questions.map(q => ({
-        questionId: q.id,
-        category: q.category,
-        selected: mcqAnswers[q.id],
-        isCorrect: mcqAnswers[q.id] === (q.correctAnswer || q.correct_answer || q.correct)
-      }));
+      const formattedAnswers = questions.map(q => {
+        const sel = mcqAnswers[q.id] ? mcqAnswers[q.id].toUpperCase() : null;
+        const cor = (q.correctAnswer || q.correct_answer || q.correct || "").toUpperCase();
+        return {
+          questionId: q.id,
+          category: q.category,
+          selected: sel,
+          isCorrect: sel === cor
+        };
+      });
       onComplete(formattedAnswers);
     }
   };
@@ -64,7 +68,12 @@ const AptitudeRound = ({ questions = [], onComplete }) => {
     </div>
   );
 
-  const correctAnswer = currentQ.correctAnswer || currentQ.correct_answer || currentQ.correct;
+  const correctAnswer = (
+    currentQ.correctAnswer || 
+    currentQ.correct_answer || 
+    currentQ.correct || 
+    ""
+  ).toUpperCase();
 
   return (
     <div
@@ -118,7 +127,7 @@ const AptitudeRound = ({ questions = [], onComplete }) => {
           {/* Category + Difficulty badges */}
           <div className="flex items-center gap-3 mb-4">
             <span className="px-3 py-1 bg-[var(--bg-2)] text-[var(--text-2)] text-xs font-medium rounded-md uppercase tracking-wider">
-              {CATEGORY_LABELS[currentQ.category] || currentQ.category || 'Aptitude'}
+              {currentQ.categoryLabel || (CATEGORY_LABELS[currentQ.category] || currentQ.category) || "Aptitude"}
             </span>
             <span className="px-3 py-1 border border-[var(--border)] text-[var(--text-2)] text-xs font-medium rounded-md uppercase tracking-wider">
               {currentQ.difficulty || 'Medium'}
@@ -135,8 +144,9 @@ const AptitudeRound = ({ questions = [], onComplete }) => {
           {/* 2x2 Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Object.entries(currentQ.options || {}).map(([key, value]) => {
-              const isSelected = selected === key;
-              const isCorrect = correctAnswer === key;
+              const normalizedKey = key.toUpperCase();
+              const isSelected = selected === normalizedKey;
+              const isCorrect = correctAnswer === normalizedKey;
               const showCheck = selected && isCorrect;
               const showCross = selected && isSelected && !isCorrect;
 
@@ -159,7 +169,7 @@ const AptitudeRound = ({ questions = [], onComplete }) => {
                 <button
                   key={key}
                   disabled={!!selected}
-                  onClick={() => handleSelect(key)}
+                  onClick={() => handleSelect(normalizedKey)}
                   className="flex items-start gap-4 p-5 rounded-xl border transition-all text-left group"
                   style={borderStyle}
                 >
@@ -210,7 +220,7 @@ const AptitudeRound = ({ questions = [], onComplete }) => {
             Explanation
           </div>
           <p className="text-sm leading-relaxed" style={{ color: 'var(--text-1)' }}>
-            {currentQ.explanation}
+            {currentQ.explanation || currentQ.explain || "No explanation available"}
           </p>
         </motion.div>
       )}
