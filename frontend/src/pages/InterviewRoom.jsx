@@ -29,7 +29,8 @@ const InterviewRoom = () => {
     roundSummaries,
     isInterviewComplete,
     completeAptitudeRound,
-    endInterview
+    endInterview,
+    resetInterviewState
   } = useInterviewStore();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -73,16 +74,18 @@ const InterviewRoom = () => {
     };
 
     if (interviewId) {
+      resetInterviewState(); // Call your store's reset action to avoid stale state from previous sessions
       fetchSession();
     }
-  }, [interviewId, initSession]);
+  }, [interviewId, initSession, resetInterviewState]);
 
   // ✅ Hook 2 — navigate when complete (MUST be before any early returns)
   useEffect(() => {
-    if ((roundStatus === 'complete' || isInterviewComplete) && interviewId) {
+    // ✅ Only navigate if interview was actually active first
+    if ((roundStatus === 'complete' || isInterviewComplete) && interviewId && !isLoading) {
       navigate(`/results/${interviewId}`);
     }
-  }, [roundStatus, isInterviewComplete, interviewId, navigate]);
+  }, [roundStatus, isInterviewComplete, interviewId, navigate, isLoading]);
 
   // ✅ Handler — defined before early returns
   const handleRoundComplete = async (answers) => {

@@ -374,7 +374,14 @@ const useInterviewStore = create(
             hrCurrentIndex: 0,
             interviewStartTime: null
         });
-      }
+      },
+
+      resetInterviewState: () => set({
+        roundStatus: 'active',
+        isInterviewComplete: false,
+        roundData: null,
+        roundSummaries: [],
+      }),
     }),
     { name: 'skilio-interview-flow' }
   )
